@@ -22,7 +22,7 @@ jobs:
 
       - name: Run Go Mod Tidy
         run: go mod tidy
-
+    
       - name: Bump version and tag
         id: bump_version
         run: |
@@ -35,7 +35,7 @@ jobs:
           version: latest
           args: release --clean --debug
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Updated to use PAT
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
         
             
