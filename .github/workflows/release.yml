@@ -13,10 +13,10 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Set up Go
+      - name: Set up Go 1.19
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: '1.19'  # Make sure this matches the version in your go.mod file
 
       - name: Run Go Mod Tidy
         run: go mod tidy
