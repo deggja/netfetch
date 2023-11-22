@@ -1,2 +1,20 @@
-# netfetch
-a CLI tool written in Golang that looks for implicit default deny network policies in all non-system namespaces. All namespaces not meeting the requirements will be listed in stdout for the user.
+## Using Netfetch Tool
+
+The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, comparing them with a predefined standard to ensure they adhere to best practices. This document guides you on how to use `netfetch` to perform these scans.
+
+### Prerequisites
+
+Before you begin, ensure you have the following:
+
+- `netfetch` binary installed in your system.
+- Access to a Kubernetes cluster with configured `kubectl`.
+- Sufficient permissions to list namespaces and network policies in the cluster.
+
+### Basic Usage
+
+The primary command provided by `netfetch` is `scan`. This command scans all non-system Kubernetes namespaces for network policies.
+
+#### Command Structure
+
+```sh
+./netfetch scan
