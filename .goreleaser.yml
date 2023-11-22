@@ -1,10 +1,10 @@
 # .goreleaser.yml
-project_name: netfetch  # Replace with your project name
+project_name: netfetch
 
 # Build configuration
 builds:
   - id: "netfetch"
-    main: ./cmd/netfetch/main.go  # Path to your main.go file
+    main: ./main.go
     binary: netfetch
     goos:
       - linux
