@@ -1,0 +1,32 @@
+# .goreleaser.yml
+project_name: netfetch  # Replace with your project name
+
+# Build configuration
+builds:
+  - id: "netfetch"
+    main: ./cmd/netfetch/main.go  # Path to your main.go file
+    binary: netfetch
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Additional build flags can be added here
+
+# Archive configuration
+archives:
+  - id: "archive"
+    builds:
+      - netfetch
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    wrap_in_directory: true
+
+# Release configuration
+release:
+  github:
+    owner: deggja
+    name: netfetch
+  draft: false
