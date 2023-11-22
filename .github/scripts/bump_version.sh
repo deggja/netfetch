@@ -23,9 +23,9 @@ else
   new_tag="${major}.${minor}.${patch}"
 fi
 
-# Set output for the next steps
-echo "Setting new tag to $new_tag"
-echo "::set-output name=new_tag::$new_tag"
+# Set output for the next steps using environment file
+echo "new_tag=$new_tag" >> $GITHUB_ENV
 
 # Create the new tag
 git tag $new_tag
+git push --tags
