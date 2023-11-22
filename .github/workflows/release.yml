@@ -18,6 +18,9 @@ jobs:
         with:
           go-version: 1.18
 
+      - name: Run Go Mod Tidy
+        run: go mod tidy
+
       - name: Bump version and tag
         id: bump_version
         run: |
@@ -28,7 +31,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
-          args: release --rm-dist
-        env:
+          args: release --snapshot --rm-dist --debug
+          env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             
