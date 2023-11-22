@@ -35,6 +35,7 @@ jobs:
           version: latest
           args: release --clean --debug
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Updated to use PAT
+        
         
             

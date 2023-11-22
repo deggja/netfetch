@@ -2,11 +2,8 @@
 
 # Fetch tags
 git fetch --tags
+latest_tag=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null)
 
-# Get the latest tag
-latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
-
-# If there are no tags yet, start with 0.0.1
 if [ -z "$latest_tag" ]; then
   new_tag="0.0.1"
 else
