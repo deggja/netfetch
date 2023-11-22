@@ -1,2 +1,2 @@
 # netfetch
-Kubernetes CLI tool that uses kubectl commands and ksniff (https://github.com/eldadru/ksniff)
+a CLI tool written in Golang that looks for implicit default deny network policies in all non-system namespaces. All namespaces not meeting the requirements will be listed in stdout.
