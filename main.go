@@ -1,7 +1,7 @@
 package main
 
 import (
-	"netfetch/cmd"
+	"github.com/deggja/netfetch/cmd"
 )
 
 func main() {
