@@ -1,2 +1,2 @@
 # netfetch
-Kubernetes Operator
+Kubernetes CLI tool
