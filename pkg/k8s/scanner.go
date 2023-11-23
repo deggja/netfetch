@@ -47,26 +47,68 @@ func ScanNetworkPolicies() {
 
 		policies, err := clientset.NetworkingV1().NetworkPolicies(ns.Name).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			fmt.Printf("Error listing network policies in namespace %s: %s\n", ns.Name, err)
+			fmt.Printf("\nError listing network policies in namespace %s: %s\n", ns.Name, err)
 			continue
 		}
 
-		if !hasDefaultDenyAllPolicy(policies.Items) {
-			fmt.Printf("The namespace %s does not contain a default deny all network policy.\n", ns.Name)
+		coveredPods := make(map[string]bool)
+		hasPolicies := false
 
-			// Use survey to ask the user
-			confirm := false
-			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("Do you want to add a default deny all network policy to the namespace %s?", ns.Name),
+		for _, policy := range policies.Items {
+			hasPolicies = true
+			fmt.Printf("Network policy found: %s in namespace %s\n", policy.Name, ns.Name)
+
+			// Get the pods targeted by this policy
+			selector, err := metav1.LabelSelectorAsSelector(&policy.Spec.PodSelector)
+			if err != nil {
+				fmt.Printf("Error parsing selector for policy %s: %s\n", policy.Name, err)
+				continue
 			}
-			survey.AskOne(prompt, &confirm, nil)
 
-			if confirm {
-				err := createAndApplyDefaultDenyPolicy(clientset, ns.Name)
-				if err != nil {
-					fmt.Printf("Failed to apply default deny policy in namespace %s: %s\n", ns.Name, err)
-				} else {
-					fmt.Printf("Applied default deny policy in namespace %s\n", ns.Name)
+			pods, err := clientset.CoreV1().Pods(ns.Name).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: selector.String(),
+			})
+			if err != nil {
+				fmt.Printf("Error listing pods for policy %s: %s\n", policy.Name, err)
+				continue
+			}
+
+			for _, pod := range pods.Items {
+				coveredPods[pod.Name] = true
+				fmt.Printf("Pod covered by policy %s: Name: %s, IP: %s\n", policy.Name, pod.Name, pod.Status.PodIP)
+			}
+		}
+
+		if !hasPolicies || !hasDefaultDenyAllPolicy(policies.Items) {
+			allPods, err := clientset.CoreV1().Pods(ns.Name).List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				fmt.Printf("Error listing all pods in namespace %s: %s\n", ns.Name, err)
+				continue
+			}
+
+			unprotectedPods := false
+			for _, pod := range allPods.Items {
+				if !coveredPods[pod.Name] {
+					unprotectedPods = true
+					fmt.Printf("Unprotected Pod: Name: %s, IP: %s\n", pod.Name, pod.Status.PodIP)
+				}
+			}
+
+			if unprotectedPods {
+				// Ask the user whether to add a network policy
+				confirm := false
+				prompt := &survey.Confirm{
+					Message: fmt.Sprintf("Do you want to add a default deny all network policy to the namespace %s?", ns.Name),
+				}
+				survey.AskOne(prompt, &confirm, nil)
+
+				if confirm {
+					err := createAndApplyDefaultDenyPolicy(clientset, ns.Name)
+					if err != nil {
+						fmt.Printf("\nFailed to apply default deny policy in namespace %s: %s\n", ns.Name, err)
+					} else {
+						fmt.Printf("\nApplied default deny policy in namespace %s\n", ns.Name)
+					}
 				}
 			}
 		}
@@ -112,7 +154,7 @@ func isDefaultDenyAllPolicy(policy networkingv1.NetworkPolicy) bool {
 // isSystemNamespace checks if the given namespace is a system namespace
 func isSystemNamespace(namespace string) bool {
 	switch namespace {
-	case "kube-system", "tigera-operator", "kube-public", "kube-node-lease":
+	case "kube-system", "tigera-operator", "kube-public", "kube-node-lease", "gatekeeper-system", "calico-system":
 		return true
 	default:
 		return false
