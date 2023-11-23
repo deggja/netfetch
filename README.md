@@ -26,4 +26,4 @@ The primary command provided by `netfetch` is `scan`. This command scans all non
 #### Command Structure
 
 ```sh
-./netfetch scan
+netfetch scan
