@@ -7,7 +7,7 @@ The `netfetch` tool is designed to scan Kubernetes namespaces for network polici
 You can install `netfetch` using our Homebrew tap:
 
 ```sh
-brew tap deggja/netfetch
+brew tap deggja/netfetch https://github.com/deggja/netfetch
 brew install netfetch
 ```
 
