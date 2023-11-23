@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/AlecAivazis/survey/v2"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -52,8 +53,45 @@ func ScanNetworkPolicies() {
 
 		if !hasDefaultDenyAllPolicy(policies.Items) {
 			fmt.Printf("The namespace %s does not contain a default deny all network policy.\n", ns.Name)
+
+			// Use survey to ask the user
+			confirm := false
+			prompt := &survey.Confirm{
+				Message: fmt.Sprintf("Do you want to add a default deny all network policy to the namespace %s?", ns.Name),
+			}
+			survey.AskOne(prompt, &confirm, nil)
+
+			if confirm {
+				err := createAndApplyDefaultDenyPolicy(clientset, ns.Name)
+				if err != nil {
+					fmt.Printf("Failed to apply default deny policy in namespace %s: %s\n", ns.Name, err)
+				} else {
+					fmt.Printf("Applied default deny policy in namespace %s\n", ns.Name)
+				}
+			}
 		}
 	}
+}
+
+// Function to create the implicit default deny if missing
+func createAndApplyDefaultDenyPolicy(clientset *kubernetes.Clientset, namespace string) error {
+	policyName := namespace + "-default-deny-all"
+	policy := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      policyName,
+			Namespace: namespace,
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{}, // Selects all pods in the namespace
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+				networkingv1.PolicyTypeEgress,
+			},
+		},
+	}
+
+	_, err := clientset.NetworkingV1().NetworkPolicies(namespace).Create(context.TODO(), policy, metav1.CreateOptions{})
+	return err
 }
 
 // hasDefaultDenyAllPolicy checks if the list of policies includes a default deny all policy
