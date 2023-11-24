@@ -12,7 +12,3 @@ class Netfetch < Formula
       system "#{bin}/netfetch", "--version"
     end
   end
-<<<<<<< HEAD
-=======
-  
->>>>>>> be953cb5bea308074e3d9979057f2d9e94e5214e
