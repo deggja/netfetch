@@ -6,11 +6,16 @@ import (
 )
 
 var scanCmd = &cobra.Command{
-	Use:   "scan",
+	Use:   "scan [namespace]",
 	Short: "Scan Kubernetes namespaces for network policies",
 	Long:  `Scan all non-system Kubernetes namespaces for network policies and compare them with predefined standards.`,
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		k8s.ScanNetworkPolicies()
+		var namespace string
+		if len(args) > 0 {
+			namespace = args[0]
+		}
+		k8s.ScanNetworkPolicies(namespace)
 	},
 }
 
