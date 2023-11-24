@@ -3,7 +3,9 @@
 The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, checking if there are implicit defautl deny policies in place or any other policy targetting the pods. This document guides you on how to use `netfetch` to perform these scans.
 
 ## Contribute
-Feel free to contribute. Open issues or create a pull request if there is something missing that you would like to see.
+You are welcome to contribute!
+ 
+Open an issue or create a pull request if there is some functionality missing that you would like.
 
 ## Installation via Homebrew
 
