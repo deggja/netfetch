@@ -1,3 +1,5 @@
+![image](https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7)
+
 ## Using Netfetch Tool
 
 The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, checking if there are implicit defautl deny policies in place or any other policy targetting the pods.
