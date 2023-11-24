@@ -2,6 +2,9 @@
 
 The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, comparing them with a predefined standard to ensure they adhere to best practices. This document guides you on how to use `netfetch` to perform these scans.
 
+## Contribute
+Feel free to contribute. Open issues or create a pull request if there is something missing that you would like to see.
+
 ## Installation via Homebrew
 
 You can install `netfetch` using our Homebrew tap:
@@ -27,3 +30,4 @@ The primary command provided by `netfetch` is `scan`. This command scans all non
 
 ```sh
 netfetch scan
+```
