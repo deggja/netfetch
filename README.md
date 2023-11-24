@@ -43,3 +43,7 @@ You can also specifiy namespaces when running netfetch.
 ```sh
 netfetch scan default
 ```
+
+## License
+
+[MIT License], see [LICENSE](LICENSE).
