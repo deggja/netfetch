@@ -40,6 +40,10 @@ func ScanNetworkPolicies() {
 		return
 	}
 
+	// Flag to track if any network policy is missing or if there are any uncovered pods
+	missingPoliciesOrUncoveredPods := false
+	userDeniedPolicyApplication := false
+
 	for _, ns := range namespaces.Items {
 		if isSystemNamespace(ns.Name) {
 			continue
@@ -51,12 +55,12 @@ func ScanNetworkPolicies() {
 			continue
 		}
 
+		// Initialize coveredPods map and hasPolicies flag
 		coveredPods := make(map[string]bool)
-		hasPolicies := false
+		hasPolicies := len(policies.Items) > 0
 
 		for _, policy := range policies.Items {
-			hasPolicies = true
-			fmt.Printf("Network policy found: %s in namespace %s\n", policy.Name, ns.Name)
+			// ... existing policy handling code ...
 
 			// Get the pods targeted by this policy
 			selector, err := metav1.LabelSelectorAsSelector(&policy.Spec.PodSelector)
@@ -75,7 +79,6 @@ func ScanNetworkPolicies() {
 
 			for _, pod := range pods.Items {
 				coveredPods[pod.Name] = true
-				fmt.Printf("Pod covered by policy %s: Name: %s, IP: %s\n", policy.Name, pod.Name, pod.Status.PodIP)
 			}
 		}
 
@@ -86,16 +89,28 @@ func ScanNetworkPolicies() {
 				continue
 			}
 
+			// Check for unprotected pods
 			unprotectedPods := false
+			var unprotectedPodDetails []string
+
 			for _, pod := range allPods.Items {
 				if !coveredPods[pod.Name] {
+					missingPoliciesOrUncoveredPods = true
 					unprotectedPods = true
-					fmt.Printf("Unprotected Pod: Name: %s, IP: %s\n", pod.Name, pod.Status.PodIP)
+					podDetail := fmt.Sprintf("%-30s %-20s %-15s", ns.Name, pod.Name, pod.Status.PodIP)
+					unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
 				}
 			}
 
 			if unprotectedPods {
-				// Ask the user whether to add a network policy
+				if len(unprotectedPodDetails) > 0 {
+					fmt.Printf("\nNetfetch found the following unprotected pods:\n\n")
+					fmt.Printf("%-30s %-20s %-15s\n", "Namespace", "Pod Name", "Pod IP")
+					for _, detail := range unprotectedPodDetails {
+						fmt.Println(detail)
+					}
+				}
+
 				confirm := false
 				prompt := &survey.Confirm{
 					Message: fmt.Sprintf("Do you want to add a default deny all network policy to the namespace %s?", ns.Name),
@@ -109,9 +124,22 @@ func ScanNetworkPolicies() {
 					} else {
 						fmt.Printf("\nApplied default deny policy in namespace %s\n", ns.Name)
 					}
+				} else {
+					userDeniedPolicyApplication = true
 				}
 			}
 		}
+	}
+
+	// Print appropriate message based on scan results
+	if missingPoliciesOrUncoveredPods {
+		if userDeniedPolicyApplication {
+			fmt.Println("\nYou should assess the need of implementing either an implicit default deny all network policy or a network policy that targets the pods currently not selected by a network policy. Check the Kubernetes documentation for more information on network policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/")
+		} else {
+			fmt.Println("\nNetfetch scan completed.")
+		}
+	} else {
+		fmt.Println("\nNo network policies missing. You are good to go!")
 	}
 }
 
