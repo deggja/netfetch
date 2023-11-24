@@ -28,9 +28,10 @@ func printToBoth(writer *bufio.Writer, s string) {
 // ScanNetworkPolicies scans namespaces for network policies
 func ScanNetworkPolicies(specificNamespace string) {
 	var output bytes.Buffer
-	writer := bufio.NewWriter(&output)
-
+	var namespacesToScan []string
 	var kubeconfig string
+
+	writer := bufio.NewWriter(&output)
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = filepath.Join(home, ".kube", "config")
 	}
@@ -47,7 +48,6 @@ func ScanNetworkPolicies(specificNamespace string) {
 		return
 	}
 
-	var namespacesToScan []string
 	if specificNamespace != "" {
 		namespacesToScan = append(namespacesToScan, specificNamespace)
 	} else {
@@ -65,7 +65,11 @@ func ScanNetworkPolicies(specificNamespace string) {
 
 	missingPoliciesOrUncoveredPods := false
 	userDeniedPolicyApplication := false
+	policyChangesMade := false
+	confirm := false
+
 	deniedNamespaces := []string{}
+	unprotectedPodDetails := []string{}
 
 	for _, nsName := range namespacesToScan {
 		policies, err := clientset.NetworkingV1().NetworkPolicies(nsName).List(context.TODO(), metav1.ListOptions{})
@@ -106,6 +110,13 @@ func ScanNetworkPolicies(specificNamespace string) {
 				errorMsg := fmt.Sprintf("Error listing all pods in namespace %s: %s\n", nsName, err)
 				printToBoth(writer, errorMsg)
 				continue
+			}
+			unprotectedPodsCount := len(unprotectedPodDetails)
+			if unprotectedPodsCount > 0 || !hasDenyAll || !hasPolicies {
+				missingPoliciesOrUncoveredPods = true
+			}
+			if confirm {
+				policyChangesMade = true
 			}
 
 			unprotectedPods := false
@@ -174,6 +185,14 @@ func ScanNetworkPolicies(specificNamespace string) {
 		}
 	}
 
+	// Calculate the final score after scanning all namespaces
+	finalScore := calculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, len(deniedNamespaces))
+	fmt.Printf("\nYour Netfetch security score is: %d/42\n", finalScore)
+
+	if policyChangesMade {
+		fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
+	}
+
 	if missingPoliciesOrUncoveredPods {
 		if userDeniedPolicyApplication {
 			printToBoth(writer, "\nFor the following namespaces, you should assess the need of implementing network policies:\n")
@@ -233,4 +252,27 @@ func isSystemNamespace(namespace string) bool {
 	default:
 		return false
 	}
+}
+
+// Scoring logic
+func calculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int) int {
+	// Simple scoring logic - can be more complex based on requirements
+	score := 42 // Start with the highest score
+
+	if !hasPolicies {
+		score -= 20
+	}
+
+	if !hasDenyAll {
+		score -= 15
+	}
+
+	// Deduct score based on the number of unprotected pods
+	score -= unprotectedPodsCount
+
+	if score < 1 {
+		score = 1 // Minimum score
+	}
+
+	return score
 }
