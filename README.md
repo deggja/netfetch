@@ -11,7 +11,7 @@ You are welcome to contribute!
  
 Open an issue or create a pull request if there is some functionality missing that you would like.
 
-## Installation via Homebrew
+## Installation via Homebrew for Mac
 
 You can install `netfetch` using our Homebrew tap:
 
@@ -19,6 +19,8 @@ You can install `netfetch` using our Homebrew tap:
 brew tap deggja/netfetch https://github.com/deggja/netfetch
 brew install netfetch
 ```
+
+For specific Linux distros, Windows etc. Check the latest release for a downloadable binary.
 
 ### Prerequisites
 
@@ -28,11 +30,11 @@ Before you begin, ensure you have the following:
 - Access to a Kubernetes cluster with configured `kubectl`.
 - Sufficient permissions to list namespaces and network policies in the cluster.
 
-### Basic Usage
+### Basic usage
 
 The primary command provided by `netfetch` is `scan`. This command scans all non-system Kubernetes namespaces for network policies.
 
-#### Command Structure
+#### Command structure
 
 ```sh
 netfetch scan
@@ -43,6 +45,12 @@ You can also specifiy namespaces when running netfetch.
 ```sh
 netfetch scan default
 ```
+
+## Netfetch score
+
+The `netfetch` tool provides a score at the end of each scan. The score ranges from 1 to 42, with 1 being the lowest and 42 being the highest possible score.
+
+This score reflects the security posture of your Kubernetes namespaces based on network policies and pod coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in an improved score.
 
 ## License
 
