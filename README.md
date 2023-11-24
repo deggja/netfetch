@@ -37,3 +37,9 @@ The primary command provided by `netfetch` is `scan`. This command scans all non
 ```sh
 netfetch scan
 ```
+
+You can also specifiy namespaces when running netfetch.
+
+```sh
+netfetch scan default
+```
