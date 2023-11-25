@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -25,11 +26,24 @@ func printToBoth(writer *bufio.Writer, s string) {
 	fmt.Fprint(writer, s)
 }
 
+// Struct to represent scan results in dashboard
+type ScanResult struct {
+	NamespacesScanned  []string
+	DeniedNamespaces   []string
+	UnprotectedPods    []string
+	PolicyChangesMade  bool
+	UserDeniedPolicies bool
+	HasDenyAll         []string
+	Score              int
+}
+
 // ScanNetworkPolicies scans namespaces for network policies
-func ScanNetworkPolicies(specificNamespace string) {
+func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool) (*ScanResult, error) {
 	var output bytes.Buffer
 	var namespacesToScan []string
 	var kubeconfig string
+
+	scanResult := new(ScanResult)
 
 	writer := bufio.NewWriter(&output)
 	if home := homedir.HomeDir(); home != "" {
@@ -39,13 +53,13 @@ func ScanNetworkPolicies(specificNamespace string) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		fmt.Printf("Error building kubeconfig: %s\n", err)
-		return
+		return nil, err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		fmt.Printf("Error creating Kubernetes client: %s\n", err)
-		return
+		return nil, err
 	}
 
 	if specificNamespace != "" {
@@ -54,7 +68,7 @@ func ScanNetworkPolicies(specificNamespace string) {
 		allNamespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			fmt.Printf("Error listing namespaces: %s\n", err)
-			return
+			return nil, err
 		}
 		for _, ns := range allNamespaces.Items {
 			if !isSystemNamespace(ns.Name) {
@@ -66,10 +80,8 @@ func ScanNetworkPolicies(specificNamespace string) {
 	missingPoliciesOrUncoveredPods := false
 	userDeniedPolicyApplication := false
 	policyChangesMade := false
-	confirm := false
 
 	deniedNamespaces := []string{}
-	unprotectedPodDetails := []string{}
 
 	for _, nsName := range namespacesToScan {
 		policies, err := clientset.NetworkingV1().NetworkPolicies(nsName).List(context.TODO(), metav1.ListOptions{})
@@ -81,7 +93,6 @@ func ScanNetworkPolicies(specificNamespace string) {
 
 		hasDenyAll := hasDefaultDenyAllPolicy(policies.Items)
 		coveredPods := make(map[string]bool)
-		hasPolicies := len(policies.Items) > 0
 
 		for _, policy := range policies.Items {
 			selector, err := metav1.LabelSelectorAsSelector(&policy.Spec.PodSelector)
@@ -103,42 +114,36 @@ func ScanNetworkPolicies(specificNamespace string) {
 			}
 		}
 
-		var tableOutput strings.Builder
-		if !hasPolicies || hasDenyAll {
+		if !hasDenyAll {
+			var unprotectedPodDetails []string
 			allPods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				errorMsg := fmt.Sprintf("Error listing all pods in namespace %s: %s\n", nsName, err)
 				printToBoth(writer, errorMsg)
 				continue
 			}
-			unprotectedPodsCount := len(unprotectedPodDetails)
-			if unprotectedPodsCount > 0 || !hasDenyAll || !hasPolicies {
-				missingPoliciesOrUncoveredPods = true
-			}
-			if confirm {
-				policyChangesMade = true
-			}
 
-			unprotectedPods := false
-			var unprotectedPodDetails []string
 			for _, pod := range allPods.Items {
 				if !coveredPods[pod.Name] {
-					missingPoliciesOrUncoveredPods = true
-					unprotectedPods = true
-					podDetail := fmt.Sprintf("%-30s %-20s %-15s", nsName, pod.Name, pod.Status.PodIP)
+					podDetail := fmt.Sprintf("%s %s %s", nsName, pod.Name, pod.Status.PodIP)
 					unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
 				}
 			}
 
-			if unprotectedPods {
+			if len(unprotectedPodDetails) > 0 {
+				missingPoliciesOrUncoveredPods = true
+				if !isCLI {
+					scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
+				}
+				scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
+			}
+
+			if isCLI {
 				if len(unprotectedPodDetails) > 0 {
-					tableOutput.WriteString("\nNetfetch found the following unprotected pods:\n\n")
-					tableOutput.WriteString(fmt.Sprintf("%-30s %-20s %-15s\n", "Namespace", "Pod Name", "Pod IP"))
+					fmt.Println("\nUnprotected Pods found in namespace", nsName+":")
 					for _, detail := range unprotectedPodDetails {
-						tableOutput.WriteString(detail + "\n")
+						fmt.Println(detail)
 					}
-					fmt.Print(tableOutput.String())
-					writer.WriteString(tableOutput.String())
 				}
 
 				confirm := false
@@ -148,17 +153,23 @@ func ScanNetworkPolicies(specificNamespace string) {
 				survey.AskOne(prompt, &confirm, nil)
 
 				if confirm {
-					err := createAndApplyDefaultDenyPolicy(clientset, nsName)
+					err := createAndApplyDefaultDenyPolicy(nsName)
 					if err != nil {
 						errorPolicyMsg := fmt.Sprintf("\nFailed to apply default deny policy in namespace %s: %s\n", nsName, err)
 						printToBoth(writer, errorPolicyMsg)
 					} else {
 						successPolicyMsg := fmt.Sprintf("\nApplied default deny policy in namespace %s\n", nsName)
 						printToBoth(writer, successPolicyMsg)
+						policyChangesMade = true
 					}
 				} else {
 					userDeniedPolicyApplication = true
 					deniedNamespaces = append(deniedNamespaces, nsName)
+				}
+			} else {
+				scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
+				if len(unprotectedPodDetails) > 0 {
+					scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
 				}
 			}
 		}
@@ -206,10 +217,30 @@ func ScanNetworkPolicies(specificNamespace string) {
 	} else {
 		printToBoth(writer, "\nNo network policies missing. You are good to go!\n")
 	}
+	// Calculate the score
+	score := calculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, len(deniedNamespaces))
+	// Set the score in scanResult
+	scanResult.Score = score
+	return scanResult, nil
 }
 
 // Function to create the implicit default deny if missing
-func createAndApplyDefaultDenyPolicy(clientset *kubernetes.Clientset, namespace string) error {
+func createAndApplyDefaultDenyPolicy(namespace string) error {
+	// Initialize Kubernetes client
+	var kubeconfig string
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = filepath.Join(home, ".kube", "config")
+	}
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		return err
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	// Define the network policy
 	policyName := namespace + "-default-deny-all"
 	policy := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -225,7 +256,8 @@ func createAndApplyDefaultDenyPolicy(clientset *kubernetes.Clientset, namespace 
 		},
 	}
 
-	_, err := clientset.NetworkingV1().NetworkPolicies(namespace).Create(context.TODO(), policy, metav1.CreateOptions{})
+	// Create the policy
+	_, err = clientset.NetworkingV1().NetworkPolicies(namespace).Create(context.TODO(), policy, metav1.CreateOptions{})
 	return err
 }
 
@@ -275,4 +307,58 @@ func calculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int)
 	}
 
 	return score
+}
+
+// INTERACTIVE DASHBOARD LOGIC
+
+// handleScanRequest handles the HTTP request for scanning network policies
+func HandleScanRequest(w http.ResponseWriter, r *http.Request) {
+	// Extract parameters from request, e.g., namespace
+	namespace := r.URL.Query().Get("namespace")
+
+	// Perform the scan
+	result, err := ScanNetworkPolicies(namespace, true, false)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with JSON
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func HandleAddPolicyRequest(w http.ResponseWriter, r *http.Request) {
+	// Define a struct to parse the incoming request
+	type request struct {
+		Namespace string `json:"namespace"`
+	}
+
+	// Parse the incoming JSON request
+	var req request
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Apply the default deny policy
+	err := createAndApplyDefaultDenyPolicy(req.Namespace)
+	if err != nil {
+		http.Error(w, "Failed to apply default deny policy: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with success message
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Implicit default deny all network policy successfully added to namespace " + req.Namespace})
+
+	scanResult, err := ScanNetworkPolicies(req.Namespace, true, false)
+	if err != nil {
+		http.Error(w, "Error re-scanning after applying policy: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with updated scan results
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(scanResult)
 }
