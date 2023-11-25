@@ -1,86 +1,81 @@
 <template>
-  <div id="app" class="white-background">
+  <div id="app" class="app-container">
     <!-- Sidebar Menu -->
-    <aside class="sidebar-menu">
-      <ul>
-        <li>
+    <aside class="sidebar">
+      <div class="logo-container">
+        <img src="@/assets/logo.png" alt="Netfetch Logo" class="logo">
+      </div>
+      <ul class="menu">
+        <li class="menu-item">
           <a href="#" class="active">Overview</a>
         </li>
-        <li>
+        <li class="menu-item">
           <a href="https://github.com/deggja/netfetch" target="_blank">GitHub</a>
         </li>
       </ul>
     </aside>
 
     <!-- Main Content -->
-    <main class="main-content">
-      <div class="header-content">
-          <!-- Main Dashboard Header -->
-          <header class="app-header">
-            <img src="@/assets/logo.png" alt="Netfetch Logo" class="logo">
-          </header>
+    <main class="content">
+      <div class="header">
+        <h1 class="dashboard-title">Netfetch Dashboard</h1>
+        <div class="score-container" v-if="scanInitiated">
+          <span class="score">{{ netfetchScore !== null ? netfetchScore : '...' }}</span>
+        </div>
+      </div>
 
-        <div class="dashboard-title-score">
-          <h1 class="white-text">Netfetch Dashboard</h1>
-          <!-- Score Display -->
-          <div v-if="scanInitiated" class="score-display">
-            <svg class="donut-chart" width="100" height="100" viewBox="0 0 42 42">
-              <circle class="donut-ring" cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#fff" stroke-width="3"></circle>
-              <circle class="donut-segment" cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#ce4b99" stroke-width="3" stroke-dasharray="70 30" stroke-dashoffset="25"></circle>
-              <text x="50%" y="50%" class="donut-score white-text" text-anchor="middle" dy=".3em">{{ netfetchScore !== null ? netfetchScore : 'Calculating...' }}</text>
-            </svg>
+      <div class="buttons">
+        <button @click="fetchScanResults" class="scan-btn">Scan Cluster</button>
+        <button @click="fetchScanResults" class="scan-btn">Scan Namespace</button>
+      </div>
+
+      <div class="message-container">
+        <!-- Success or Error Message Display -->
+        <div v-if="message" :class="{'success-message': message.type === 'success', 'error-message': message.type === 'error'}">
+          {{ message.text }}
+        </div>
+      </div>
+
+      <div class="table-container">
+        <!-- Unprotected Pods Table -->
+        <section v-if="unprotectedPods.length > 0 && scanInitiated">
+          <div v-for="(pods, namespace) in paginatedPods" :key="namespace">
+            <h3 @click="toggleNamespace(namespace)" class="namespace-header">
+              {{ namespace }}
+              <span class="namespace-toggle-indicator">{{ isNamespaceExpanded(namespace) ? '▲' : '▼' }}</span>
+            </h3>
+            <table v-show="isNamespaceExpanded(namespace)" class="pods-table">
+              <thead>
+                <tr>
+                  <th>Pod Name</th>
+                  <th>Pod IP</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="pod in pods" :key="pod.name">
+                  <td>{{ pod.name }}</td>
+                  <td>{{ pod.ip }}</td>
+                  <td>
+                    <button @click="remediate(pod.namespace)" class="remediate-btn">Remediate</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
+          <div class="pagination-controls">
+            <button @click="changePage(-1)" :disabled="currentPage === 1" class="pagination-btn">Previous</button>
+            <button @click="changePage(1)" :disabled="currentPage * pageSize >= totalPods" class="pagination-btn">Next</button>
+          </div>
+        </section>
 
-        <div class="scan-buttons">
-          <button @click="fetchScanResults" class="scan-btn light-blue">Scan Cluster</button>
-          <button @click="fetchScanResults" class="scan-btn light-blue">Scan Namespace</button>
-        </div>
+        <!-- Message for No Missing Policies -->
+        <h2 v-else class="no-policies-message">No network policies missing. You are good to go!</h2>
       </div>
-
-      <!-- Success or Error Message Display -->
-      <div v-if="message" :class="{'success-message': message.type === 'success', 'error-message': message.type === 'error'}">
-        {{ message.text }}
-      </div>
-
-      <!-- Unprotected Pods Table -->
-      <section v-if="unprotectedPods.length > 0 && scanInitiated" class="pods-table-section">
-        <div v-for="(pods, namespace) in paginatedPods" :key="namespace">
-          <h3 @click="toggleNamespace(namespace)">
-            {{ namespace }}
-            <span class="namespace-toggle-indicator">{{ isNamespaceExpanded(namespace) ? '▲' : '▼' }}</span>
-          </h3>
-          <table v-show="isNamespaceExpanded(namespace)">
-            <thead>
-              <tr>
-                <th>Pod Name</th>
-                <th>Pod IP</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="pod in pods" :key="pod.name">
-                <td>{{ pod.name }}</td>
-                <td>{{ pod.ip }}</td>
-                <td>
-                  <button @click="remediate(pod.namespace)" class="remediate-btn light-blue">Remediate</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="pagination-controls">
-          <button @click="changePage(-1)" :disabled="currentPage === 1" class="pagination-btn">Previous</button>
-          <button @click="changePage(1)" :disabled="currentPage * pageSize >= totalPods" class="pagination-btn">Next</button>
-        </div>
-      </section>
-
-
-      <!-- Message for No Missing Policies -->
-      <h2 v-else class="white-text">No network policies missing. You are good to go!</h2>
     </main>
   </div>
 </template>
+
 
 
 <script>
@@ -213,304 +208,219 @@ export default {
 </script>
 
 <style>
+  /* Base styles */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Helvetica', sans-serif;
+  }
 
-/* Main Content Styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  color: black;
-}
+  body, html {
+    background-color: #f5f5f5;
+    color: #333;
+  }
 
-.main-content {
-  padding-left: 220px;
-}
+  /* App container */
+  .app-container {
+    display: flex;
+    min-height: 100vh;
+  }
 
-/* Main app background */
-.white-background {
-  background-color: #fff;
-}
+  /* Sidebar styles */
+  .sidebar {
+    background-color: #fff;
+    width: 200px;
+    border-right: 5px solid #87CEEB;
+    border-width: 1px;
+    padding: 20px;
+  }
 
-.white-text {
-  color: black;
-}
+  .logo-container {
+    margin-bottom: 20px;
+  }
 
+  .menu {
+    list-style-type: none;
+  }
 
-/* Header styles */
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 80px;
-  padding: 0 20px;
-}
+  .menu-item a {
+    display: block;
+    padding: 10px;
+    color: #333;
+    text-decoration: none;
+    border-left: 5px solid transparent;
+  }
 
-/* Dashboard Title and Score */
-.dashboard-title-score {
-  display: flex;
-  align-items: center;
-}
+  .menu-item a.active {
+    border-left: 5px solid #87CEEB;
+    background-color: #eee;
+  }
 
-.app-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background-color: #fff;
-  z-index: 9;
-  padding: 10px 20px;
-}
+  .menu-item a:hover {
+    background-color: #ddd;
+  }
 
-.header {
-  display: flex;
-  align-items: center;
-  padding: 10px;
-}
+  /* Content styles */
+  .content {
+    flex-grow: 1;
+    padding: 40px;
+  }
 
-.logo {
-  height: 70px;
-  width: auto;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 15;
-  padding: 10px;
-  background-color: #fff;
-}
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
 
-.sidebar-menu {
-  width: 180px;
-  position: fixed;
-  top: 80px;
-  bottom: 0;
-  left: 0;
-  background-color: #fff;
-  z-index: 10;
-  padding-top: 10px;
-}
+  .dashboard-title {
+    color: #333;
+    font-size: 24px;
+  }
 
-.menu ul {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
-}
+  .score-container {
+    width: 100px;
+    height: 100px;
+    border: 5px solid #87CEEB;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-.menu li a {
-  padding: 12px 16px;
-  text-decoration: none;
-  display: block;
-  color: black;
-}
+  .score {
+    font-size: 24px;
+    font-weight: bold;
+  }
 
-.menu li a:hover {
-  background-color: #ddd;
-}
+  /* Button styles */
+  .buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
 
-/* Table Styles */
-table {
-  width: 80%;
-  margin: auto;
-}
+  .scan-btn {
+    padding: 10px 20px;
+    border: 2px solid #87CEEB;
+    border-radius: 5px;
+    background-color: #fff;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
 
-.pods-table-section {
-  background-color: #fff;
-  padding: 20px;
-}
+  .scan-btn:hover {
+    background-color:#87CEEB;
+    color: #fff;
+  }
 
-th, td {
-  padding: 12px 15px;
-  text-align: left;
-}
+  /* Message container */
+  .message-container {
+    margin-bottom: 20px;
+  }
 
-th {
-  background-color: #add8e6;
-}
+  .success-message {
+    background-color: #28a745;
+    color: #fff;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+  }
 
-tr:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
+  .error-message {
+    background-color: #dc3545;
+    color: #fff;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+  }
 
-/* Style for buttons */
-.scan-buttons {
-  display: flex;
-}
+  /* Table container */
+  .table-container {
+    background-color: #fff;
+    border: 2px solid #87CEEB;
+    padding: 20px;
+    border-radius: 1px;
+  }
 
-button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 1em;
-  transition: background-color 0.3s;
-}
+  .namespace-header {
+    cursor: pointer;
+    margin: 20px 0;
+    font-size: 18px;
+  }
 
-.light-blue {
-  background-color: #add8e6; /* Light blue background */
-}
+  .namespace-toggle-indicator {
+    font-size: 0.8em;
+    margin-left: 5px;
+  }
 
-button:hover {
-  background-color: #218838;
-}
+  .pods-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+  }
 
-/* General Styles */
-body, html {
-  margin: 0;
-  color: 000;
-  padding: 0;
-  background-color: #fff;
-}
+  .pods-table th, .pods-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
 
-a {
-  color: #000;
-  text-decoration: none;
-}
+  .pods-table th {
+    background-color: #f0f0f0;
+  }
 
-a:hover {
-  text-decoration: underline;
-}
+  .pods-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
 
-#app {
-  max-width: 1200px;
-  margin: 40px auto 20px 0;
-  padding: 20px;
-  padding-top: 60px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
-}
+  .pods-table tr:hover {
+    background-color: #f1f1f1;
+  }
 
-h1 {
-  color: #333;
-}
+  .remediate-btn {
+    background-color: #87CEEB;
+    color: white;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
 
-h2 {
-  color: white;
-  margin-top: 30px;
-}
+  .remediate-btn:hover {
+    background-color: #87CEEB;
+  }
 
-h3 {
-  cursor: pointer;
-}
+  /* Pagination styles */
+  .pagination-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
 
-.remediate-btn {
-  background-color: #ff9800; /* Orange color for attention */
-  color: white;
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  position: relative; /* Required for tooltip positioning */
-}
+  .pagination-btn {
+    padding: 5px 10px;
+    margin: 0 10px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+  }
 
-.remediate-btn:hover {
-  background-color: #e68a00; /* Darker shade for hover effect */
-}
+  .pagination-btn:hover {
+    background-color: #f0f0f0;
+  }
 
-.tooltip {
-  visibility: hidden;
-  width: 220px;
-  background-color: black;
-  color: #fff;
-  text-align: center;
-  border-radius: 6px;
-  padding: 5px;
-  position: absolute;
-  z-index: 1;
-  bottom: 125%;
-  left: 50%;
-  margin-left: -110px; /* Half of the width to align it */
-  opacity: 0;
-  transition: opacity 0.3s
-}
+  .pagination-btn:disabled {
+    color: #aaa;
+    cursor: not-allowed;
+  }
 
-.remediate-btn:hover .tooltip {
-  visibility: visible;
-  opacity: 1;
-}
-
-/* Score Display Styles */
-.score-display {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Success and Error Message Styles */
-.success-message, .error-message {
-  padding: 10px;
-  border-radius: 5px;
-  text-align: center;
-  margin-top: 20px;
-}
-
-.success-message {
-  background-color: #28a745;
-}
-
-.error-message {
-  background-color: #dc3545;
-}
-
-/* Style the Donut */
-.donut-chart-container {
-  position: relative;
-  width: 200px;
-  height: 200px;
-}
-
-.donut-chart {
-  transform: rotate(-90deg);
-}
-
-.donut-ring {
-  stroke-width: 3;
-}
-
-.donut-segment {
-  transition: stroke-dasharray 0.3s;
-}
-
-.donut-score {
-  fill: #000;
-  font-size: 0.3em;
-  font-weight: bold;
-  text-anchor: middle;
-  transform: rotate(90deg);
-  transform-origin: center
-}
-
-/* Ensures all text is black */
-body, html, div, span, applet, object, iframe,
-h1, h2, h3, h4, h5, h6, p, blockquote, pre,
-a, abbr, acronym, address, big, cite, code,
-del, dfn, em, img, ins, kbd, q, s, samp,
-small, strike, strong, sub, sup, tt, var,
-b, u, i, center,
-dl, dt, dd, ol, ul, li,
-fieldset, form, label, legend,
-table, caption, tbody, tfoot, thead, tr, th, td,
-article, aside, canvas, details, embed, 
-figure, figcaption, footer, header, hgroup, 
-menu, nav, output, ruby, section, summary,
-time, mark, audio, video {
-  color: black;
-  border: none;
-}
-
-/* Pagination */
-.pagination-controls {
-  display: flex;
-  justify-content: center;
-}
-
-.pagination-btn {
-  margin: 0 10px;
-}
-
-.namespace-toggle-indicator {
-  font-size: 0.8em; /* smaller size than namespace name */
-  margin-left: 5px; /* space between name and indicator */
-  cursor: pointer; /* indicates interactiveness */
-}
-
+  .no-policies-message {
+    color: #28a745;
+    text-align: center;
+    margin-top: 20px;
+  }
 </style>
+

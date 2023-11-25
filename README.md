@@ -34,6 +34,10 @@ Before you begin, ensure you have the following:
 
 The primary command provided by `netfetch` is `scan`. This command scans all non-system Kubernetes namespaces for network policies.
 
+You can also scan specific namespaces by specifying the name of that namespace.
+
+In addition to the basic command functionalities, you can start an interactive dashboard in your web browser using the following command:
+
 #### Command structure
 
 ```sh
@@ -44,6 +48,12 @@ You can also specifiy namespaces when running netfetch.
 
 ```sh
 netfetch scan default
+```
+
+Launch interactive dashboard
+
+```sh
+netfetch dash
 ```
 
 ## Netfetch score
