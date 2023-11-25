@@ -15,10 +15,10 @@
     <!-- Main Content -->
     <main class="main-content">
       <div class="header-content">
-        <!-- Main Dashboard Header -->
-        <header class="app-header">
-          <img src="@/assets/logo.png" alt="Netfetch Logo" class="logo">
-        </header>
+          <!-- Main Dashboard Header -->
+          <header class="app-header">
+            <img src="@/assets/logo.png" alt="Netfetch Logo" class="logo">
+          </header>
 
         <div class="dashboard-title-score">
           <h1 class="white-text">Netfetch Dashboard</h1>
@@ -224,7 +224,6 @@ export default {
 
 .main-content {
   padding-left: 220px;
-  padding-top: 100px;
 }
 
 /* Main app background */
