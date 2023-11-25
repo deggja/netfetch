@@ -2,7 +2,7 @@
 
 ## Using Netfetch Tool
 
-The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, checking if there are implicit defautl deny policies in place or any other policy targetting the pods.
+The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, checking whether implicit default deny policies are in place and examining any other policies targeting the pods.
 
 This document guides you on how to use `netfetch` to perform these scans.
 
