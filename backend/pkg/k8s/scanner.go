@@ -126,16 +126,21 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 			for _, pod := range allPods.Items {
 				if !coveredPods[pod.Name] {
 					podDetail := fmt.Sprintf("%s %s %s", nsName, pod.Name, pod.Status.PodIP)
-					unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
+					// Prevent adding duplicate pod details in UnprotectedPods
+					if !containsPodDetail(scanResult.UnprotectedPods, podDetail) {
+						unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
+					}
 				}
 			}
 
 			if len(unprotectedPodDetails) > 0 {
 				missingPoliciesOrUncoveredPods = true
 				if !isCLI {
-					scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
+					if !contains(scanResult.DeniedNamespaces, nsName) {
+						scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
+					}
+					scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
 				}
-				scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
 			}
 
 			if isCLI {
@@ -361,4 +366,24 @@ func HandleAddPolicyRequest(w http.ResponseWriter, r *http.Request) {
 	// Respond with updated scan results
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(scanResult)
+}
+
+// contains checks if a string is present in a slice
+func contains(slice []string, str string) bool {
+	for _, v := range slice {
+		if v == str {
+			return true
+		}
+	}
+	return false
+}
+
+// containsPodDetail checks if a pod detail string is present in a slice
+func containsPodDetail(slice []string, detail string) bool {
+	for _, v := range slice {
+		if v == detail {
+			return true
+		}
+	}
+	return false
 }

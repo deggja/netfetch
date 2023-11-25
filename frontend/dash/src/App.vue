@@ -1,67 +1,87 @@
 <template>
-  <div id="app">
+  <div id="app" class="white-background">
+    <!-- Sidebar Menu -->
+    <aside class="sidebar-menu">
+      <ul>
+        <li>
+          <a href="#" class="active">Overview</a>
+        </li>
+        <li>
+          <a href="https://github.com/deggja/netfetch" target="_blank">GitHub</a>
+        </li>
+      </ul>
+    </aside>
 
-    <!-- Logo and Hamburger Menu -->
-    <header class="app-header">
-      <img src="@/assets/logo.png" alt="Netfetch Logo" class="logo">
-      <button class="hamburger" @click="toggleMenu">&#9776;</button>
-      <nav v-if="menuVisible" class="menu">
-        <ul>
-          <li><a href="#">Overview</a></li>
-        </ul>
-      </nav>
-    </header>
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="header-content">
+        <!-- Main Dashboard Header -->
+        <header class="app-header">
+          <img src="@/assets/logo.png" alt="Netfetch Logo" class="logo">
+        </header>
 
-    <h1>Netfetch Dashboard</h1>
-    <button @click="fetchScanResults">Scan Network Policies</button>
+        <div class="dashboard-title-score">
+          <h1 class="white-text">Netfetch Dashboard</h1>
+          <!-- Score Display -->
+          <div v-if="scanInitiated" class="score-display">
+            <svg class="donut-chart" width="100" height="100" viewBox="0 0 42 42">
+              <circle class="donut-ring" cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#fff" stroke-width="3"></circle>
+              <circle class="donut-segment" cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#ce4b99" stroke-width="3" stroke-dasharray="70 30" stroke-dashoffset="25"></circle>
+              <text x="50%" y="50%" class="donut-score white-text" text-anchor="middle" dy=".3em">{{ netfetchScore !== null ? netfetchScore : 'Calculating...' }}</text>
+            </svg>
+          </div>
+        </div>
 
-    <!-- Score Display -->
-    <div v-if="scanInitiated" class="score-display">
-      <h2>Your Netfetch Score</h2>
-      <div class="donut-chart-container">
-        <svg class="donut-chart" width="200" height="200" viewBox="0 0 42 42">
-          <circle class="donut-ring" cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#d2d3d4" stroke-width="3"></circle>
-          <circle class="donut-segment" cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#ce4b99" stroke-width="3" stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
-          <text x="50%" y="50%" class="donut-score" text-anchor="middle" dy=".3em">{{ netfetchScore !== null ? netfetchScore : 'Calculating...' }}</text>
-        </svg>
+        <div class="scan-buttons">
+          <button @click="fetchScanResults" class="scan-btn light-blue">Scan Cluster</button>
+          <button @click="fetchScanResults" class="scan-btn light-blue">Scan Namespace</button>
+        </div>
       </div>
-    </div>
 
-    <!-- Display Success or Error Message -->
-    <div v-if="message" :class="{ 'success-message': message.type === 'success', 'error-message': message.type === 'error' }">
-      {{ message.text }}
-    </div>
+      <!-- Success or Error Message Display -->
+      <div v-if="message" :class="{'success-message': message.type === 'success', 'error-message': message.type === 'error'}">
+        {{ message.text }}
+      </div>
 
-    <!-- Message when no unprotected pods are found -->
-    <div v-if="unprotectedPods.length === 0 && scanInitiated">
-      <h2>No network policies missing. You are good to go!</h2>
-    </div>
+      <!-- Unprotected Pods Table -->
+      <section v-if="unprotectedPods.length > 0 && scanInitiated" class="pods-table-section">
+        <div v-for="(pods, namespace) in paginatedPods" :key="namespace">
+          <h3 @click="toggleNamespace(namespace)">
+            {{ namespace }}
+            <span class="namespace-toggle-indicator">{{ isNamespaceExpanded(namespace) ? '▲' : '▼' }}</span>
+          </h3>
+          <table v-show="isNamespaceExpanded(namespace)">
+            <thead>
+              <tr>
+                <th>Pod Name</th>
+                <th>Pod IP</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="pod in pods" :key="pod.name">
+                <td>{{ pod.name }}</td>
+                <td>{{ pod.ip }}</td>
+                <td>
+                  <button @click="remediate(pod.namespace)" class="remediate-btn light-blue">Remediate</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination-controls">
+          <button @click="changePage(-1)" :disabled="currentPage === 1" class="pagination-btn">Previous</button>
+          <button @click="changePage(1)" :disabled="currentPage * pageSize >= totalPods" class="pagination-btn">Next</button>
+        </div>
+      </section>
 
-    <!-- Table for Unprotected Pods -->
-    <div v-else-if="unprotectedPods.length > 0">
-      <h2>Unprotected Pods</h2>
-      <table>
-        <tr>
-          <th>Namespace</th>
-          <th>Pod Name</th>
-          <th>Pod IP</th>
-          <th>Action</th>
-        </tr>
-        <tr v-for="pod in unprotectedPods" :key="pod.name">
-          <td>{{ pod.namespace }}</td>
-          <td>{{ pod.name }}</td>
-          <td>{{ pod.ip }}</td>
-          <td>
-            <button @click="remediate(pod.namespace)" class="remediate-btn">
-              Remediate
-              <span class="tooltip">Apply a default deny all network policy to this namespace</span>
-            </button>
-          </td>
-        </tr>
-      </table>
-    </div>
+
+      <!-- Message for No Missing Policies -->
+      <h2 v-else class="white-text">No network policies missing. You are good to go!</h2>
+    </main>
   </div>
 </template>
+
 
 <script>
 import axios from 'axios';
@@ -76,6 +96,9 @@ export default {
       message: null,
       netfetchScore: null,
       menuVisible: false,
+      currentPage: 1,
+      pageSize: 10,
+      expandedNamespaces: {},
     };
   },
   watch: {
@@ -90,6 +113,30 @@ export default {
       }
     },
   },
+  computed: {
+    groupedPods() {
+      return this.unprotectedPods.reduce((acc, pod) => {
+        if (!acc[pod.namespace]) {
+          acc[pod.namespace] = [];
+        }
+        acc[pod.namespace].push(pod);
+        return acc;
+        }, {});
+      },
+      paginatedPods() {
+      const start = (this.currentPage - 1) * this.pageSize;
+      const namespaces = Object.keys(this.groupedPods);
+      const paginatedNamespaces = namespaces.slice(start, start + this.pageSize);
+      let paginated = {};
+      paginatedNamespaces.forEach(namespace => {
+        paginated[namespace] = this.groupedPods[namespace];
+      });
+      return paginated;
+    },
+    totalPods() {
+      return this.unprotectedPods.length;
+    }
+  },
   methods: {
     toggleMenu() {
       this.menuVisible = !this.menuVisible;
@@ -98,22 +145,40 @@ export default {
     this.scanInitiated = true;
     try {
       const response = await axios.get('http://localhost:8080/scan');
-      console.log("Backend response:", response.data); // Add this line
       this.scanResults = response.data;
+      this.unprotectedPods = [];
       this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
       this.netfetchScore = response.data.Score;
+      const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
+      namespaces.forEach(namespace => {
+        this.expandedNamespaces, namespace, true;
+      });
     } catch (error) {
       console.error('Error fetching scan results:', error);
       }
+      this.updateExpandedNamespaces();
+    },
+    updateExpandedNamespaces() {
+      const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
+      namespaces.forEach(namespace => {
+        this.expandedNamespaces, namespace, true;
+      });
     },
     parseUnprotectedPods(data) {
-    if (!data || !Array.isArray(data)) {
-      return []; // Return an empty array if data is null or not an array
-    }
-    return data.map(podDetail => {
-      const [namespace, name, ip] = podDetail.split(' ');
-      return { namespace, name, ip };
+      if (!data || !Array.isArray(data)) {
+        return [];
+      }
+
+      const uniquePods = {};
+      data.forEach(podDetail => {
+        const [namespace, name, ip] = podDetail.split(' ');
+        const key = `${namespace}-${name}-${ip}`;
+        if (!uniquePods[key]) {
+          uniquePods[key] = { namespace, name, ip };
+        }
       });
+
+      return Object.values(uniquePods);
     },
     async remediate(namespace) {
     try {
@@ -130,23 +195,71 @@ export default {
       console.error('Error applying policy to', namespace, ':', error);
       }
     },
+    toggleNamespace(namespace) {
+      this.expandedNamespaces[namespace] = !this.expandedNamespaces[namespace];
+    },
+    isNamespaceExpanded(namespace) {
+      return !!this.expandedNamespaces[namespace];
+    },
+    changePage(step) {
+      this.currentPage += step;
+    },
+    mounted() {
+    // Call updateExpandedNamespaces on mount to handle initial data
+      this.updateExpandedNamespaces();
+    },
   },
 };
 </script>
 
 <style>
 
-/* Header styles */
-.app-header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 10px;
+/* Main Content Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  color: black;
+}
+
+.main-content {
+  padding-left: 220px;
+  padding-top: 100px;
+}
+
+/* Main app background */
+.white-background {
   background-color: #fff;
+}
+
+.white-text {
+  color: black;
+}
+
+
+/* Header styles */
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 80px;
+  padding: 0 20px;
+}
+
+/* Dashboard Title and Score */
+.dashboard-title-score {
+  display: flex;
+  align-items: center;
+}
+
+.app-header {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 1000;
+  right: 0;
+  background-color: #fff;
+  z-index: 9;
+  padding: 10px 20px;
 }
 
 .header {
@@ -157,25 +270,24 @@ export default {
 
 .logo {
   height: 70px;
-  margin-bottom: 10px;
+  width: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 15;
+  padding: 10px;
+  background-color: #fff;
 }
 
-.hamburger {
-  color: #000;
-  background: none;
-  border: none;
-  font-size: 34px;
-  cursor: pointer;
-  margin-left: 5px;
-}
-
-.menu {
-  display: none;
-  position: absolute;
-  background-color: none;
-  min-width: 160px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-  z-index: 1;
+.sidebar-menu {
+  width: 180px;
+  position: fixed;
+  top: 80px;
+  bottom: 0;
+  left: 0;
+  background-color: #fff;
+  z-index: 10;
+  padding-top: 10px;
 }
 
 .menu ul {
@@ -197,8 +309,13 @@ export default {
 
 /* Table Styles */
 table {
-  width: 100%;
-  border-collapse: collapse;
+  width: 80%;
+  margin: auto;
+}
+
+.pods-table-section {
+  background-color: #fff;
+  padding: 20px;
 }
 
 th, td {
@@ -207,9 +324,7 @@ th, td {
 }
 
 th {
-  background-color: rgba(0, 123, 255, 0.5);
-  color: white;
-  font-weight: bold;
+  background-color: #add8e6;
 }
 
 tr:hover {
@@ -217,14 +332,21 @@ tr:hover {
 }
 
 /* Style for buttons */
+.scan-buttons {
+  display: flex;
+}
+
 button {
-  background-color: #28a745;
-  color: 000;
-  padding: 8px 15px;
+  padding: 10px 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
+  font-size: 1em;
   transition: background-color 0.3s;
+}
+
+.light-blue {
+  background-color: #add8e6; /* Light blue background */
 }
 
 button:hover {
@@ -250,7 +372,7 @@ a:hover {
 
 #app {
   max-width: 1200px;
-  margin: 40px auto;
+  margin: 40px auto 20px 0;
   padding: 20px;
   padding-top: 60px;
   background: rgba(255, 255, 255, 0.1);
@@ -265,6 +387,10 @@ h1 {
 h2 {
   color: white;
   margin-top: 30px;
+}
+
+h3 {
+  cursor: pointer;
 }
 
 .remediate-btn {
@@ -305,25 +431,9 @@ h2 {
 
 /* Score Display Styles */
 .score-display {
-  /* Remove background and box-shadow if not needed */
-  margin: 20px auto;
   display: flex;
   justify-content: center;
   align-items: center;
-  color: white;
-}
-
-.score {
-  font-size: 24px;
-  font-weight: bold;
-  color: white;
-}
-
-.card {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 20px;
-  margin-bottom: 20px;
 }
 
 /* Success and Error Message Styles */
@@ -386,6 +496,22 @@ menu, nav, output, ruby, section, summary,
 time, mark, audio, video {
   color: black;
   border: none;
+}
+
+/* Pagination */
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+}
+
+.pagination-btn {
+  margin: 0 10px;
+}
+
+.namespace-toggle-indicator {
+  font-size: 0.8em; /* smaller size than namespace name */
+  margin-left: 5px; /* space between name and indicator */
+  cursor: pointer; /* indicates interactiveness */
 }
 
 </style>
