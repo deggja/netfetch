@@ -10,6 +10,8 @@ require (
 	k8s.io/client-go v0.28.4
 )
 
+require github.com/rakyll/statik v0.1.7 // indirect
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
