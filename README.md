@@ -15,7 +15,7 @@ brew tap deggja/netfetch https://github.com/deggja/netfetch
 brew install netfetch
 ```
 
-For specific Linux distros and other install binaries, check the latest release.
+For specific Linux distros, Windows and other install binaries, check the latest release.
 
 ### Prerequisites
 
