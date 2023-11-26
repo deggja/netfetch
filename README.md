@@ -49,7 +49,7 @@ Launch interactive dashboard.
 netfetch dash
 ```
 
-![Netfetch Dashboard](https://github.com/deggja/frontend/src/assets/netfetch_dash.png)
+![Netfetch Dashboard](https://github.com/deggja/netfetch/frontend/src/assets/netfetch_dash.png)
 
 ## Netfetch score
 
