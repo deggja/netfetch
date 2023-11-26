@@ -5,7 +5,10 @@ import (
 	"log"
 	"net/http"
 
+	_ "github.com/deggja/netfetch/backend/statik"
+
 	"github.com/deggja/netfetch/backend/pkg/k8s"
+	"github.com/rakyll/statik/fs"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 )
@@ -48,6 +51,11 @@ func startDashboardServer() {
 }
 
 func dashboardHandler(w http.ResponseWriter, r *http.Request) {
-	// Serve the Vue.js UI
-	http.FileServer(http.Dir("netfetch/frontend/dash")).ServeHTTP(w, r)
+	statikFS, err := fs.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Serve the embedded frontend
+	http.FileServer(statikFS).ServeHTTP(w, r)
 }
