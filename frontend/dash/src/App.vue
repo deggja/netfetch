@@ -17,6 +17,10 @@
 
     <!-- Main Content -->
     <main class="content">
+      <head>
+        <title>Netfetch Dashboard</title>
+        <link rel="icon" type="image/x-icon" href="/assets/logo.png">
+      </head>
       <div class="header">
         <h1 class="dashboard-title">Netfetch Dashboard</h1>
         <div class="score-container" v-if="scanInitiated">
@@ -25,8 +29,14 @@
       </div>
 
       <div class="buttons">
-        <button @click="fetchScanResults" class="scan-btn">Scan Cluster</button>
-        <button @click="fetchScanResults" class="scan-btn">Scan Namespace</button>
+        <button @click="fetchScanResults" class="scan-btn">Scan cluster</button>
+        <button @click="fetchScanResultsForNamespace" class="scan-btn">Scan namespace</button>
+        <select v-model="selectedNamespace" class="namespace-select">
+          <option disabled value="">Select a namespace</option>
+          <option v-for="namespace in allNamespaces" :key="namespace" :value="namespace">
+            {{ namespace }}
+          </option>
+        </select>
       </div>
 
       <div class="message-container">
@@ -94,6 +104,8 @@ export default {
       currentPage: 1,
       pageSize: 10,
       expandedNamespaces: {},
+      selectedNamespace: '',
+      allNamespaces: [],
     };
   },
   watch: {
@@ -119,18 +131,51 @@ export default {
         }, {});
       },
       paginatedPods() {
-      const start = (this.currentPage - 1) * this.pageSize;
-      const namespaces = Object.keys(this.groupedPods);
-      const paginatedNamespaces = namespaces.slice(start, start + this.pageSize);
-      let paginated = {};
-      paginatedNamespaces.forEach(namespace => {
-        paginated[namespace] = this.groupedPods[namespace];
-      });
+      const grouped = this.groupedPods;
+      const paginated = {};
+      let startIndex = 0;
+      let namespaceIndex = 0;
+
+      let podsCounter = 0;
+      for (const ns in grouped) {
+        const podsInNamespace = grouped[ns].length;
+        if (podsCounter + podsInNamespace >= (this.currentPage - 1) * this.pageSize) {
+          startIndex = (this.currentPage - 1) * this.pageSize - podsCounter;
+          namespaceIndex = Object.keys(grouped).indexOf(ns);
+          break;
+        }
+        podsCounter += podsInNamespace;
+      }
+
+      let podsAdded = 0;
+      while (podsAdded < this.pageSize && namespaceIndex < Object.keys(grouped).length) {
+        const currentNamespace = Object.keys(grouped)[namespaceIndex];
+        const podsInNamespace = grouped[currentNamespace].slice(startIndex, startIndex + this.pageSize - podsAdded);
+        paginated[currentNamespace] = podsInNamespace;
+        podsAdded += podsInNamespace.length;
+
+        startIndex = 0;
+        namespaceIndex++;
+      }
+
       return paginated;
     },
     totalPods() {
-      return this.unprotectedPods.length;
-    }
+    return this.unprotectedPods.length;
+    },
+    totalPages() {
+    return Math.ceil(this.totalPods / this.pageSize);
+    },
+    startIndexForCurrentPage() {
+      let count = 0;
+      for (let i = 0; i < this.unprotectedPods.length; i++) {
+        if (count >= (this.currentPage - 1) * this.pageSize) {
+          return i;
+        }
+        count += this.unprotectedPods[i].length;
+      }
+      return 0;
+    },
   },
   methods: {
     toggleMenu() {
@@ -144,6 +189,7 @@ export default {
       this.unprotectedPods = [];
       this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
       this.netfetchScore = response.data.Score;
+      this.updateExpandedNamespaces();
       const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
       namespaces.forEach(namespace => {
         this.expandedNamespaces, namespace, true;
@@ -154,9 +200,9 @@ export default {
       this.updateExpandedNamespaces();
     },
     updateExpandedNamespaces() {
-      const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
-      namespaces.forEach(namespace => {
-        this.expandedNamespaces, namespace, true;
+    const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
+    namespaces.forEach(namespace => {
+      this.expandedNamespaces[namespace] = true;
       });
     },
     parseUnprotectedPods(data) {
@@ -197,11 +243,45 @@ export default {
       return !!this.expandedNamespaces[namespace];
     },
     changePage(step) {
-      this.currentPage += step;
+      this.currentPage = Math.max(1, Math.min(this.currentPage + step, this.totalPages));
+    },
+    async fetchAllNamespaces() {
+      console.log('fetchAllNamespaces called');
+      try {
+        const response = await axios.get('http://localhost:8080/namespaces');
+        this.allNamespaces = response.data.namespaces;
+        console.log('Namespaces fetched:', this.allNamespaces);
+      } catch (error) {
+        console.error('Error fetching namespaces:', error);
+      }
+    },
+    async fetchScanResultsForNamespace() {
+      if (!this.selectedNamespace) {
+        alert('Please select a namespace.');
+        return;
+      }
+
+      this.scanInitiated = true;
+      try {
+        const response = await axios.get(`http://localhost:8080/scan?namespace=${this.selectedNamespace}`);
+        this.scanResults = response.data;
+        if (response.data.UnprotectedPods && response.data.UnprotectedPods.length > 0) {
+          this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
+          this.netfetchScore = response.data.Score;
+          this.updateExpandedNamespaces();
+        } else {
+          this.unprotectedPods = [];
+          this.message = { type: 'success', text: 'No network policies missing in the selected namespace.' };
+          this.netfetchScore = null;
+        }
+      } catch (error) {
+        console.error('Error fetching scan results for namespace:', error);
+        this.message = { type: 'error', text: `Failed to scan namespace: ${this.selectedNamespace}` };
+      }
     },
     mounted() {
-    // Call updateExpandedNamespaces on mount to handle initial data
       this.updateExpandedNamespaces();
+      this.fetchAllNamespaces()
     },
   },
 };
@@ -310,6 +390,15 @@ export default {
     transition: background-color 0.3s;
   }
 
+  .namespace-select {
+    padding: 10px;
+    border-radius: 5px;
+    border: 2px solid #87CEEB;
+    text-align: center;
+    -moz-appearance: none;
+    appearance: none;
+  }
+
   .scan-btn:hover {
     background-color:#87CEEB;
     color: #fff;
@@ -342,12 +431,15 @@ export default {
     border: 2px solid #87CEEB;
     padding: 20px;
     border-radius: 1px;
+    width: 100%;
+    overflow-x: auto;
   }
 
   .namespace-header {
     cursor: pointer;
     margin: 20px 0;
     font-size: 18px;
+    min-width: 200px;
   }
 
   .namespace-toggle-indicator {
@@ -357,6 +449,7 @@ export default {
 
   .pods-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     margin-bottom: 20px;
   }
@@ -403,13 +496,13 @@ export default {
     padding: 5px 10px;
     margin: 0 10px;
     background-color: #fff;
-    border: 1px solid #ddd;
+    border: 1px solid #87CEEB;
     border-radius: 5px;
     cursor: pointer;
   }
 
   .pagination-btn:hover {
-    background-color: #f0f0f0;
+    background-color: #87CEEB;
   }
 
   .pagination-btn:disabled {
@@ -418,7 +511,7 @@ export default {
   }
 
   .no-policies-message {
-    color: #28a745;
+    color: black;
     text-align: center;
     margin-top: 20px;
   }
