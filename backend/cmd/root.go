@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const version = "0.0.37"
+
 var rootCmd = &cobra.Command{
 	Use:   "netfetch",
 	Short: "Netfetch is a CLI tool for scanning Kubernetes clusters for network policies",
@@ -20,11 +22,19 @@ var rootCmd = &cobra.Command{
 	Available Commands:
 	scan        	Scan Kubernetes namespaces for network policies
 	scan namespace	Scan specific namespace in cluster
-	help        	Help about any command
 	dash        	Open interactive dashboard
+	help        	Help about any command
 
 	Flags:
 	-h, --help   help for netfetch`,
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version number of Netfetch",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("Netfetch Version: %s\n", version)
+	},
 }
 
 func Execute() {
@@ -36,4 +46,5 @@ func Execute() {
 
 func init() {
 	// Here you will define your flags and configuration settings.
+	rootCmd.AddCommand(versionCmd)
 }
