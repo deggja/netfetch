@@ -17,10 +17,6 @@
 
     <!-- Main Content -->
     <main class="content">
-      <head>
-        <title>Netfetch Dashboard</title>
-        <link rel="icon" type="image/x-icon" href="/assets/logo.png">
-      </head>
       <div class="header">
         <h1 class="dashboard-title">Netfetch Dashboard</h1>
         <div class="score-container" v-if="scanInitiated">
@@ -222,18 +218,19 @@ export default {
       return Object.values(uniquePods);
     },
     async remediate(namespace) {
-    try {
-      await axios.post('http://localhost:8080/add-policy', { namespace });
-      this.message = { type: 'success', text: `Policy successfully applied to namespace: ${namespace}` };
-      this.unprotectedPods = this.unprotectedPods.filter(pod => pod.namespace !== namespace);
+      try {
+        await axios.post('http://localhost:8080/add-policy', { namespace });
+        this.message = { type: 'success', text: `Policy successfully applied to namespace: ${namespace}` };
+        this.unprotectedPods = this.unprotectedPods.filter(pod => pod.namespace !== namespace);
 
-      // Fetch updated scan results to refresh the score and the list of unprotected pods
-      const rescanResponse = await axios.get('http://localhost:8080/scan');
-      this.netfetchScore = rescanResponse.data.Score;
-      this.unprotectedPods = this.parseUnprotectedPods(rescanResponse.data.UnprotectedPods);
-    } catch (error) {
-      this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}` };
-      console.error('Error applying policy to', namespace, ':', error);
+        if (this.selectedNamespace) {
+          await this.fetchScanResultsForNamespace();
+        } else {
+          await this.fetchScanResults();
+        }
+      } catch (error) {
+        this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}` };
+        console.error('Error applying policy to', namespace, ':', error);
       }
     },
     toggleNamespace(namespace) {
@@ -267,22 +264,21 @@ export default {
         this.scanResults = response.data;
         if (response.data.UnprotectedPods && response.data.UnprotectedPods.length > 0) {
           this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
-          this.netfetchScore = response.data.Score;
+          this.netfetchScore = response.data.Score || null;
           this.updateExpandedNamespaces();
         } else {
           this.unprotectedPods = [];
-          this.message = { type: 'success', text: 'No network policies missing in the selected namespace.' };
-          this.netfetchScore = null;
+          this.netfetchScore = 42;
         }
       } catch (error) {
         console.error('Error fetching scan results for namespace:', error);
         this.message = { type: 'error', text: `Failed to scan namespace: ${this.selectedNamespace}` };
       }
     },
-    mounted() {
+  },
+  mounted() {
       this.updateExpandedNamespaces();
       this.fetchAllNamespaces()
-    },
   },
 };
 </script>
