@@ -49,6 +49,8 @@ Launch interactive dashboard.
 netfetch dash
 ```
 
+![Netfetch Dashboard](https://github.com/deggja/netfetch/assets/netfetch_dash.png)
+
 ## Netfetch score
 
 The `netfetch` tool provides a simple but accurate score at the end of each scan. The score ranges from 1 to 42, with 1 being the lowest and 42 being the highest possible score.
