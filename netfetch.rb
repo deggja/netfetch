@@ -1,8 +1,8 @@
 class Netfetch < Formula
     desc "CLI tool to scan for network policies in Kubernetes clusters and provide a score"
     homepage "https://github.com/deggja/netfetch"
-    url "https://github.com/deggja/netfetch/releases/download/0.0.28/netfetch_0.0.28_darwin_amd64.tar.gz"
-    sha256 "df9877174d0fcdc733a1c7af9fe4cc6ae99b31b2ae0a6fe2eee87d8c5d1bffc3"
+    url "https://github.com/deggja/netfetch/releases/download/0.0.35/netfetch_0.0.35_darwin_amd64.tar.gz"
+    sha256 "dfbbf121e60641ac5b1bad7abf297510178765e7b2f87049040fe5da076f7143"
   
     def install
       bin.install "netfetch"
