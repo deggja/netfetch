@@ -1,10 +1,12 @@
 name: Update Homebrew Formula
 
 on:
-  workflow_dispatch:
-  release:
-    types: [published]
-
+    workflow_dispatch:
+      inputs:
+        version:
+          description: 'Version (tag) of the release'
+          required: true  
+          
 jobs:
   update-homebrew-formula:
     runs-on: ubuntu-latest
@@ -15,10 +17,15 @@ jobs:
     - name: Calculate SHA256
       id: sha256
       run: |
-        VERSION=${GITHUB_REF#refs/tags/}
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION=${{ github.event.inputs.version }}
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
         FILENAME="netfetch_${VERSION}_darwin_amd64.tar.gz"
         curl -L -o $FILENAME "https://github.com/deggja/netfetch/releases/download/${VERSION}/${FILENAME}"
         echo "::set-output name=sha256::$(sha256sum $FILENAME | awk '{ print $1 }')"
+    
         
     - name: Update Homebrew Formula
       env:
