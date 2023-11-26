@@ -21,6 +21,7 @@
         <h1 class="dashboard-title">Netfetch Dashboard</h1>
         <div class="score-container" v-if="scanInitiated">
           <span class="score">{{ netfetchScore !== null ? netfetchScore : '...' }}</span>
+          <span class="score-label">Score</span>
         </div>
       </div>
 
@@ -363,12 +364,23 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    flex-direction: column;
   }
 
   .score {
     font-size: 24px;
     font-weight: bold;
   }
+
+  .score-label {
+  font-size: 0.8em;
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
 
   /* Button styles */
   .buttons {
