@@ -4,7 +4,7 @@ project_name: netfetch
 # Build configuration
 builds:
   - id: "netfetch"
-    main: ./main.go
+    main: ./backend/main.go
     binary: netfetch
     goos:
       - linux
