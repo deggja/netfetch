@@ -25,15 +25,15 @@ func init() {
 func startDashboardServer() {
 	// Set up CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:8081"}, // Adjust to match your frontend URL
+		AllowedOrigins: []string{"http://localhost:8081"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Content-Type", "X-CSRF-Token"},
-		// Add other CORS options as needed
 	})
 
 	// Set up handlers
 	http.HandleFunc("/", dashboardHandler)
 	http.HandleFunc("/scan", k8s.HandleScanRequest)
+	http.HandleFunc("/namespaces", k8s.HandleNamespaceListRequest)
 	http.HandleFunc("/add-policy", k8s.HandleAddPolicyRequest)
 
 	// Wrap the default serve mux with the CORS middleware

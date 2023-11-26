@@ -12,6 +12,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	networkingv1 "k8s.io/api/networking/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -145,9 +146,9 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 
 			if isCLI {
 				if len(unprotectedPodDetails) > 0 {
-					fmt.Println("\nUnprotected Pods found in namespace", nsName+":")
+					printToBoth(writer, "\nUnprotected Pods found in namespace "+nsName+":\n")
 					for _, detail := range unprotectedPodDetails {
-						fmt.Println(detail)
+						printToBoth(writer, detail+"\n")
 					}
 				}
 
@@ -331,6 +332,48 @@ func HandleScanRequest(w http.ResponseWriter, r *http.Request) {
 	// Respond with JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+// HandleNamespaceListRequest lists all non-system Kubernetes namespaces
+func HandleNamespaceListRequest(w http.ResponseWriter, r *http.Request) {
+	clientset, err := getClientset()
+	if err != nil {
+		http.Error(w, "Failed to create Kubernetes client: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	namespaces, err := clientset.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		// Handle forbidden access error specifically
+		if statusErr, isStatus := err.(*k8serrors.StatusError); isStatus {
+			if statusErr.Status().Code == http.StatusForbidden {
+				http.Error(w, "Access forbidden: "+err.Error(), http.StatusForbidden)
+				return
+			}
+		}
+		http.Error(w, "Failed to list namespaces: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var namespaceList []string
+	for _, ns := range namespaces.Items {
+		if !isSystemNamespace(ns.Name) {
+			namespaceList = append(namespaceList, ns.Name)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string][]string{"namespaces": namespaceList})
+}
+
+// getClientset creates a new Kubernetes clientset
+func getClientset() (*kubernetes.Clientset, error) {
+	kubeconfig := filepath.Join(homedir.HomeDir(), ".kube", "config")
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfig(config)
 }
 
 func HandleAddPolicyRequest(w http.ResponseWriter, r *http.Request) {
