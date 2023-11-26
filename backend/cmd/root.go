@@ -18,8 +18,10 @@ var rootCmd = &cobra.Command{
 	netfetch [command]
 
 	Available Commands:
-	scan        Scan Kubernetes namespaces for network policies
-	help        Help about any command
+	scan        	Scan Kubernetes namespaces for network policies
+	scan namespace	Scan specific namespace in cluster
+	help        	Help about any command
+	dash        	Open interactive dashboard
 
 	Flags:
 	-h, --help   help for netfetch`,

@@ -1,7 +1,9 @@
 package cmd
 
 import (
-	"github.com/deggja/netfetch/pkg/k8s"
+	"fmt"
+
+	"github.com/deggja/netfetch/backend/pkg/k8s"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +17,12 @@ var scanCmd = &cobra.Command{
 		if len(args) > 0 {
 			namespace = args[0]
 		}
-		k8s.ScanNetworkPolicies(namespace)
+		_, err := k8s.ScanNetworkPolicies(namespace, false, true)
+		if err != nil {
+			// Handle the error appropriately
+			fmt.Println("Error during scan:", err)
+			return
+		}
 	},
 }
 
