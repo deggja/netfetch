@@ -37,13 +37,13 @@ Scan entire cluster.
 netfetch scan
 ```
 
-You can also specifiy namespaces when running netfetch.
+Scan a namespace called production.
 
 ```sh
 netfetch scan production
 ```
 
-Launch interactive dashboard.
+Launch dashboard.
 
 ```sh
 netfetch dash
@@ -53,9 +53,9 @@ netfetch dash
 
 ## Netfetch score
 
-The `netfetch` tool provides a simple but accurate score at the end of each scan. The score ranges from 1 to 42, with 1 being the lowest and 42 being the highest possible score.
+The `netfetch` tool provides a basic score at the end of each scan. The score ranges from 1 to 42, with 1 being the lowest and 42 being the highest possible score.
 
-This score reflects the security posture of your Kubernetes namespaces based on network policies and pod coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
+This score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
 
 ## Contribute
 You are welcome to contribute!
