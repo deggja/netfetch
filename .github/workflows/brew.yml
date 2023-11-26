@@ -1,6 +1,7 @@
 name: Update Homebrew Formula
 
 on:
+  workflow_dispatch:
   release:
     types: [published]
 
