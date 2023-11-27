@@ -103,6 +103,7 @@ export default {
       expandedNamespaces: {},
       selectedNamespace: '',
       allNamespaces: [],
+      lastScanType: 'cluster',
     };
   },
   watch: {
@@ -180,6 +181,7 @@ export default {
     },
     async fetchScanResults() {
     this.scanInitiated = true;
+    this.lastScanType = 'cluster';
     try {
       const response = await axios.get('http://localhost:8080/scan');
       this.scanResults = response.data;
@@ -220,17 +222,22 @@ export default {
     },
     async remediate(namespace) {
       try {
-        await axios.post('http://localhost:8080/add-policy', { namespace });
-        this.message = { type: 'success', text: `Policy successfully applied to namespace: ${namespace}` };
-        this.unprotectedPods = this.unprotectedPods.filter(pod => pod.namespace !== namespace);
+        const response = await axios.post('http://localhost:8080/add-policy', { namespace });
+        if (response.status === 200) {
+          this.message = { type: 'success', text: `Policy successfully applied to namespace: ${namespace}` };
+          this.unprotectedPods = this.unprotectedPods
+            .filter(pod => pod.namespace !== namespace);
 
-        if (this.selectedNamespace) {
-          await this.fetchScanResultsForNamespace();
+          if (this.lastScanType === 'cluster') {
+            await this.fetchScanResults();
+          } else {
+            await this.fetchScanResultsForNamespace(namespace);
+          }
         } else {
-          await this.fetchScanResults();
+          this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Status code: ${response.status}` };
         }
       } catch (error) {
-        this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}` };
+        this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Error: ${error.message}` };
         console.error('Error applying policy to', namespace, ':', error);
       }
     },
@@ -253,12 +260,13 @@ export default {
         console.error('Error fetching namespaces:', error);
       }
     },
-    async fetchScanResultsForNamespace() {
-      if (!this.selectedNamespace) {
+    async fetchScanResultsForNamespace(namespace = this.selectedNamespace) {
+      if (!namespace) {
         alert('Please select a namespace.');
         return;
       }
 
+      this.lastScanType = 'namespace';
       this.scanInitiated = true;
       try {
         const response = await axios.get(`http://localhost:8080/scan?namespace=${this.selectedNamespace}`);
@@ -285,7 +293,6 @@ export default {
 </script>
 
 <style>
-  /* Base styles */
   * {
     margin: 0;
     padding: 0;
@@ -298,13 +305,11 @@ export default {
     color: #333;
   }
 
-  /* App container */
   .app-container {
     display: flex;
     min-height: 100vh;
   }
 
-  /* Sidebar styles */
   .sidebar {
     background-color: #fff;
     width: 200px;
@@ -338,7 +343,6 @@ export default {
     background-color: #ddd;
   }
 
-  /* Content styles */
   .content {
     flex-grow: 1;
     padding: 40px;
@@ -382,7 +386,6 @@ export default {
   text-align: center;
 }
 
-  /* Button styles */
   .buttons {
     display: flex;
     gap: 10px;
@@ -412,7 +415,6 @@ export default {
     color: #fff;
   }
 
-  /* Message container */
   .message-container {
     margin-bottom: 20px;
   }
@@ -493,7 +495,6 @@ export default {
     background-color: #87CEEB;
   }
 
-  /* Pagination styles */
   .pagination-controls {
     display: flex;
     justify-content: center;
