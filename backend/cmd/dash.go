@@ -38,6 +38,7 @@ func startDashboardServer() {
 	http.HandleFunc("/scan", k8s.HandleScanRequest)
 	http.HandleFunc("/namespaces", k8s.HandleNamespaceListRequest)
 	http.HandleFunc("/add-policy", k8s.HandleAddPolicyRequest)
+	http.HandleFunc("/visualization", k8s.HandleVisualizationRequest)
 
 	// Wrap the default serve mux with the CORS middleware
 	handler := c.Handler(http.DefaultServeMux)

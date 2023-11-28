@@ -81,15 +81,25 @@
       </div>
     </main>
   </div>
+  <div v-for="(vizData, namespace) in namespaceVisualizationData" :key="namespace">
+  <network-policy-visualization 
+    v-if="vizData.length > 0"
+    :policies="vizData">
+  </network-policy-visualization>
+</div>
 </template>
 
 
 
 <script>
 import axios from 'axios';
+import NetworkPolicyVisualization from './Viz.vue';
 
 export default {
   name: 'App',
+  components: {
+    NetworkPolicyVisualization,
+  },
   data() {
     return {
       scanResults: null,
@@ -104,17 +114,13 @@ export default {
       selectedNamespace: '',
       allNamespaces: [],
       lastScanType: 'cluster',
+      namespaceVisualizationData: {},
     };
   },
   watch: {
-  netfetchScore(newScore) {
-    if (newScore !== null) {
-      const maxScore = 42;
-      const normalizedScore = (newScore / maxScore) * 100;
-      const donutSegment = this.$el.querySelector('.donut-segment');
-      if (donutSegment) {
-        donutSegment.style.strokeDasharray = `${normalizedScore} ${100 - normalizedScore}`;
-        }
+  selectedNamespace(newNamespace, oldNamespace) {
+    if (newNamespace !== oldNamespace) {
+      this.fetchVisualizationData(newNamespace);
       }
     },
   },
@@ -190,9 +196,12 @@ export default {
       this.netfetchScore = response.data.Score;
       this.updateExpandedNamespaces();
       const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
+      this.fetchVisualizationDataForNamespaces(Array.from(namespaces));
       namespaces.forEach(namespace => {
         this.expandedNamespaces, namespace, true;
       });
+      this.fetchVisualizationData('');
+      this.fetchVisualizationDataForNamespaces(this.unprotectedPods.map(pod => pod.namespace));
     } catch (error) {
       console.error('Error fetching scan results:', error);
       }
@@ -220,22 +229,32 @@ export default {
 
       return Object.values(uniquePods);
     },
+    
     async remediate(namespace) {
       try {
         const response = await axios.post('http://localhost:8080/add-policy', { namespace });
         if (response.status === 200) {
           this.message = { type: 'success', text: `Policy successfully applied to namespace: ${namespace}` };
-          this.unprotectedPods = this.unprotectedPods
-            .filter(pod => pod.namespace !== namespace);
+          this.unprotectedPods = this.unprotectedPods.filter(pod => pod.namespace !== namespace);
 
           if (this.lastScanType === 'cluster') {
             await this.fetchScanResults();
           } else {
             await this.fetchScanResultsForNamespace(namespace);
           }
+
+          // Refresh the network visualization for the current namespace
+          this.fetchVisualizationData(namespace);
         } else {
           this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Status code: ${response.status}` };
         }
+        
+        this.removeVisualizationDataForNamespace(namespace);
+            // Re-fetch visualization data for the remaining namespaces
+            const remainingNamespaces = this.unprotectedPods
+                .filter(pod => pod.namespace !== namespace)
+                .map(pod => pod.namespace);
+            this.fetchVisualizationDataForNamespaces(remainingNamespaces);
       } catch (error) {
         this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Error: ${error.message}` };
         console.error('Error applying policy to', namespace, ':', error);
@@ -250,6 +269,13 @@ export default {
     changePage(step) {
       this.currentPage = Math.max(1, Math.min(this.currentPage + step, this.totalPages));
     },
+    removeVisualizationDataForNamespace(namespace) {
+        if (this.visualizationData && this.visualizationData.policies) {
+            this.visualizationData.policies = this.visualizationData.policies.filter(policy => {
+                return policy.targetPods.some(pod => pod.namespace === namespace);
+            });
+        }
+    },
     async fetchAllNamespaces() {
       console.log('fetchAllNamespaces called');
       try {
@@ -260,7 +286,8 @@ export default {
         console.error('Error fetching namespaces:', error);
       }
     },
-    async fetchScanResultsForNamespace(namespace = this.selectedNamespace) {
+    async fetchScanResultsForNamespace() {
+      const namespace = this.selectedNamespace;
       if (!namespace) {
         alert('Please select a namespace.');
         return;
@@ -269,7 +296,7 @@ export default {
       this.lastScanType = 'namespace';
       this.scanInitiated = true;
       try {
-        const response = await axios.get(`http://localhost:8080/scan?namespace=${this.selectedNamespace}`);
+        const response = await axios.get(`http://localhost:8080/scan?namespace=${namespace}`);
         this.scanResults = response.data;
         if (response.data.UnprotectedPods && response.data.UnprotectedPods.length > 0) {
           this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
@@ -279,15 +306,52 @@ export default {
           this.unprotectedPods = [];
           this.netfetchScore = 42;
         }
+        this.fetchVisualizationDataForNamespaces([namespace]);
       } catch (error) {
-        console.error('Error fetching scan results for namespace:', error);
-        this.message = { type: 'error', text: `Failed to scan namespace: ${this.selectedNamespace}` };
+        console.error('Error scanning namespace:', namespace, error);
+        this.message = { type: 'error', text: `Failed to scan namespace: ${namespace}. Error: ${error.message}` };
+      }
+    },
+    // Fetch and update visualization data for multiple namespaces
+    fetchVisualizationDataForNamespaces(namespaces) {
+      if (!Array.isArray(namespaces)) {
+        console.error('Invalid namespaces array:', namespaces);
+        return;
+      }
+      namespaces.forEach(async (namespace) => {
+        try {
+          const response = await axios.get(`http://localhost:8080/visualization?namespace=${namespace}`);
+          console.log(response); // For debugging
+   
+          if (response.data && Array.isArray(response.data.policies)) {
+            this.namespaceVisualizationData, namespace, response.data.policies;
+          } else {
+            this.namespaceVisualizationData, namespace, [];
+          }
+        } catch (error) {
+          console.error(`Error fetching visualization data for namespace ${namespace}:`, error);
+          this.namespaceVisualizationData, namespace, [];
+        }
+      });
+    },
+    // Viz
+    async fetchVisualizationData(namespace) {
+      if (!namespace) return;
+      try {
+        const response = await axios.get(`http://localhost:8080/visualization?namespace=${namespace}`);
+        if (response.data && Array.isArray(response.data.policies)) {
+          // Your existing logic
+        } else {
+          console.warn('Visualization data for namespace is null or not in expected format:', namespace);
+        }
+      } catch (error) {
+        console.error('Error fetching visualization data:', error);
       }
     },
   },
   mounted() {
       this.updateExpandedNamespaces();
-      this.fetchAllNamespaces()
+      this.fetchAllNamespaces();
   },
 };
 </script>

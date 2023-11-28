@@ -336,7 +336,7 @@ func HandleScanRequest(w http.ResponseWriter, r *http.Request) {
 
 // HandleNamespaceListRequest lists all non-system Kubernetes namespaces
 func HandleNamespaceListRequest(w http.ResponseWriter, r *http.Request) {
-	clientset, err := getClientset()
+	clientset, err := GetClientset()
 	if err != nil {
 		http.Error(w, "Failed to create Kubernetes client: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -367,7 +367,7 @@ func HandleNamespaceListRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // getClientset creates a new Kubernetes clientset
-func getClientset() (*kubernetes.Clientset, error) {
+func GetClientset() (*kubernetes.Clientset, error) {
 	kubeconfig := filepath.Join(homedir.HomeDir(), ".kube", "config")
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
