@@ -17,6 +17,7 @@ type VisualizationData struct {
 // PolicyVisualization represents a network policy and the pods it affects for visualization purposes.
 type PolicyVisualization struct {
 	Name       string   `json:"name"`
+	Namespace  string   `json:"namespace"`
 	TargetPods []string `json:"targetPods"`
 }
 
@@ -61,6 +62,7 @@ func gatherVisualizationData(namespace string) (*VisualizationData, error) {
 
 		vizData.Policies = append(vizData.Policies, PolicyVisualization{
 			Name:       policy.Name,
+			Namespace:  policy.Namespace,
 			TargetPods: podNames,
 		})
 	}
