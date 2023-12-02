@@ -87,15 +87,12 @@
     </div>
       
     <!-- Visualization components based on isShowClusterMap -->
-    <div v-if="isShowClusterMap">
-      <div v-if="clusterVisualizationData && clusterVisualizationData.length > 0">
-        <network-policy-visualization
-          v-if="isShowClusterMap && clusterVisualizationData.length > 0"
-          :key="`cluster-map-${clusterMapGenerationCount}`"
-          :clusterData="clusterVisualizationData"
-          visualizationType="cluster">
-        </network-policy-visualization>
-      </div>
+    <div v-if="isShowClusterMap && clusterVisualizationData.length > 0">
+      <network-policy-visualization
+        :key="`cluster-map-${clusterMapGenerationCount}`"
+        :clusterData="clusterVisualizationData"
+        visualizationType="cluster">
+      </network-policy-visualization>
     </div>
       
     <!-- Visualization components for namespace -->
@@ -106,7 +103,6 @@
           :policies="vizData"
           visualizationType="namespace">
         </network-policy-visualization>
-
       </div>
     </div>
     </main>
@@ -222,7 +218,7 @@ export default {
       this.menuVisible = !this.menuVisible;
     },
     async fetchScanResults() {
-    this.isShowClusterMap = false; // Add this line to hide the network map
+    this.isShowClusterMap = false;
     this.scanInitiated = true;
     this.lastScanType = 'cluster';
     try {
@@ -239,7 +235,7 @@ export default {
     async fetchNamespacesWithPolicies() {
       try {
         const response = await axios.get('http://localhost:8080/namespaces-with-policies');
-        return response.data.namespaces; // Assuming the API returns an array of namespace names
+        return response.data.namespaces;
       } catch (error) {
         console.error('Error fetching namespaces with policies:', error);
         return [];
@@ -272,7 +268,7 @@ export default {
       try {
         const response = await axios.post('http://localhost:8080/add-policy', { namespace });
         if (response.status === 200) {
-          this.message = { type: 'success', text: `Policy successfully applied to namespace: ${namespace}` };
+          this.showSuccessMessage(namespace);
           this.unprotectedPods = this.unprotectedPods.filter(pod => pod.namespace !== namespace);
 
           if (this.lastScanType === 'cluster') {
@@ -297,6 +293,12 @@ export default {
         this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Error: ${error.message}` };
         console.error('Error applying policy to', namespace, ':', error);
       }
+    },
+    showSuccessMessage(namespace) {
+    this.message = { type: 'success', text: `Policy successfully applied to namespace: ${namespace}` };
+    setTimeout(() => {
+      this.message = null;
+      }, 10000); // Clear success message after 10s
     },
     toggleNamespace(namespace) {
       this.expandedNamespaces[namespace] = !this.expandedNamespaces[namespace];
@@ -388,14 +390,19 @@ export default {
       this.clusterMapGenerationCount++;
 
       try {
-        const response = await axios.get('http://localhost:8080/visualization/cluster');
+      const response = await axios.get('http://localhost:8080/visualization/cluster');
+      if (response.data && Array.isArray(response.data)) {
         this.clusterVisualizationData = response.data;
-      } catch (error) {
-        console.error('Error fetching cluster visualization data:', error);
-      } finally {
-        this.isLoadingVisualization = false;
+      } else {
+        console.error('Received data is not an array:', response.data);
+        this.clusterVisualizationData = []; // Set to an empty array if data is not correct
       }
-   },
+    } catch (error) {
+      console.error('Error fetching cluster visualization data:', error);
+    } finally {
+      this.isLoadingVisualization = false;
+      }
+    },
 
     // Viz
     async fetchVisualizationData(namespace) {
