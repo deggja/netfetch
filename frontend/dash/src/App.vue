@@ -80,34 +80,35 @@
         <!-- Message for No Missing Policies -->
         <h2 v-else class="no-policies-message">No network policies missing. You are good to go!</h2>
       </div>
+
     <!-- Loading visualization message -->
     <div v-if="isLoadingVisualization" class="loading-message">
-        Loading visualization data...
-      </div>
+      {{ loadingMessage }}
+    </div>
       
-      <!-- Conditional rendering based on isShowClusterMap -->
+    <!-- Visualization components based on isShowClusterMap -->
     <div v-if="isShowClusterMap">
-      <!-- Render loading message or network map for the entire cluster -->
-      <div v-if="isLoadingVisualization" class="loading-message">Loading visualization data...</div>
-      <div v-else>
-        <div v-for="(vizData, namespace) in namespaceVisualizationData" :key="namespace">
-          <network-policy-visualization 
-            v-if="vizData.length > 0"
-            :policies="vizData">
-          </network-policy-visualization>
-        </div>
+      <div v-if="clusterVisualizationData && clusterVisualizationData.length > 0">
+        <network-policy-visualization
+          v-if="isShowClusterMap && clusterVisualizationData.length > 0"
+          :key="`cluster-map-${clusterMapGenerationCount}`"
+          :clusterData="clusterVisualizationData"
+          visualizationType="cluster">
+        </network-policy-visualization>
       </div>
     </div>
       
-      <!-- Visualization components -->
-      <div v-else>
-        <div v-for="(vizData, namespace) in namespaceVisualizationData" :key="namespace">
-          <network-policy-visualization 
-            v-if="vizData.length > 0"
-            :policies="vizData">
-          </network-policy-visualization>
-        </div>
+    <!-- Visualization components for namespace -->
+    <div v-if="!isShowClusterMap">
+      <div v-for="(vizData, namespace) in namespaceVisualizationData" :key="namespace">
+        <network-policy-visualization 
+          v-if="vizData && vizData.length > 0"
+          :policies="vizData"
+          visualizationType="namespace">
+        </network-policy-visualization>
+
       </div>
+    </div>
     </main>
   </div>
 </template>
@@ -131,6 +132,7 @@ export default {
       menuVisible: false,
       currentPage: 1,
       pageSize: 10,
+      clusterMapGenerationCount: 0,
       expandedNamespaces: {},
       selectedNamespace: '',
       allNamespaces: [],
@@ -138,6 +140,7 @@ export default {
       namespaceVisualizationData: {},
       isLoadingVisualization: false,
       isShowClusterMap: false,
+      isClusterMapLoading: false,
       clusterVisualizationData: [],
     };
   },
@@ -204,6 +207,15 @@ export default {
       }
       return 0;
     },
+    loadingMessage() {
+      if (this.isClusterMapLoading) {
+        return 'Loading cluster visualization data...';
+      }
+      if (this.isLoadingVisualization) {
+        return 'Loading visualization data...';
+      }
+      return '';
+    }
   },
   methods: {
     toggleMenu() {
@@ -319,8 +331,13 @@ export default {
         return;
       }
 
+      this.isShowClusterMap = false;
+      this.namespaceVisualizationData = {};
+      this.clusterVisualizationData = [];
       this.lastScanType = 'namespace';
       this.scanInitiated = true;
+      this.isLoadingVisualization = true;
+
       try {
         const scanResponse = await axios.get(`http://localhost:8080/scan?namespace=${namespace}`);
         this.scanResults = scanResponse.data;
@@ -329,7 +346,7 @@ export default {
           this.netfetchScore = scanResponse.data.Score || null;
         } else {
           this.unprotectedPods = [];
-          this.netfetchScore = 42; // Default score for no missing policies
+          this.netfetchScore = 42;
         }
         this.updateExpandedNamespaces();
 
@@ -338,6 +355,8 @@ export default {
       } catch (error) {
         console.error('Error scanning namespace:', namespace, error);
         this.message = { type: 'error', text: `Failed to scan namespace: ${namespace}. Error: ${error.message}` };
+      } finally {
+        this.isLoadingVisualization = false;
       }
     },
     // Fetch and update visualization data for multiple namespaces
@@ -362,6 +381,22 @@ export default {
       }
       this.isLoadingVisualization = false;
     },
+    async generateClusterNetworkMap() {
+      this.isShowClusterMap = true;
+      this.isLoadingVisualization = true;
+      this.namespaceVisualizationData = {};
+      this.clusterMapGenerationCount++;
+
+      try {
+        const response = await axios.get('http://localhost:8080/visualization/cluster');
+        this.clusterVisualizationData = response.data;
+      } catch (error) {
+        console.error('Error fetching cluster visualization data:', error);
+      } finally {
+        this.isLoadingVisualization = false;
+      }
+   },
+
     // Viz
     async fetchVisualizationData(namespace) {
       if (!namespace) return;
@@ -376,17 +411,6 @@ export default {
         console.error('Error fetching visualization data:', error);
       }
     },
-    async generateClusterNetworkMap() {
-    this.isShowClusterMap = true;
-    this.isLoadingVisualization = true;
-    try {
-      const response = await axios.get('http://localhost:8080/visualization/cluster');
-      this.clusterVisualizationData = response.data;
-    } catch (error) {
-      console.error('Error fetching cluster visualization data:', error);
-    }
-    this.isLoadingVisualization = false;
-    }
   },
   mounted() {
       this.updateExpandedNamespaces();
