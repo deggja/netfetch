@@ -9,22 +9,48 @@
   name: 'NetworkPolicyVisualization',
   props: {
     policies: Array,
+    clusterData: {
+      type: Array,
+      default: () => [],
+    },
+    visualizationType: {
+      type: String,
+      default: 'namespace' // Possible values: 'namespace', 'cluster'
+    },
   },
   mounted() {
     this.createNetworkMap();
   },
   methods: {
     createNetworkMap() {
-    console.log("Policies data:", this.policies)
+      let data;
+      if (this.visualizationType === 'cluster') {
+        // Flatten the policies array from the nested structure
+        data = this.clusterVisualizationData.reduce((acc, item) => {
+          if (item.policies && Array.isArray(item.policies)) {
+            return [...acc, ...item.policies];
+          }
+          return acc;
+        }, []);
+      } else {
+        data = this.policies;
+      }
+
+    console.log("Visualization data:", data);
     const container = d3.select(this.$refs.vizContainer);
     const width = 800;
     const height = 600;
 
-    // Transform policies into nodes and links
     const nodes = [];
     const links = [];
 
-    this.policies.forEach(policy => {
+    // Iterate over flattened policies
+    data.forEach(policy => {
+      if (!policy.targetPods || !Array.isArray(policy.targetPods)) {
+        console.warn(`Skipping policy ${policy.name} as it has no targetPods or targetPods is not an array`);
+        return;
+      }
+
       const policyNode = { id: policy.name, type: 'policy' };
       nodes.push(policyNode);
 
