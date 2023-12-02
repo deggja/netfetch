@@ -206,22 +206,25 @@
 
     // Add labels with hover functionality to show full text
     const labels = containerGroup.append('g')
-          .attr('class', 'labels')
-          .selectAll('text')
-          .data(nodes)
-          .enter().append('text')
-            .attr('dx', 12)
-            .attr('dy', '.35em')
-            .text(d => d.id.substring(0, 10) + '...') // Truncate text
-            .on('mouseover', (event, d) => {
-              tooltip.html(d.id) // Set the full name for the tooltip
+        .attr('class', 'labels')
+        .selectAll('text')
+        .data(nodes)
+        .enter().append('text')
+        .attr('dx', 12)
+        .attr('dy', '.35em')
+        .text(d => {
+            // Display full name for policy and truncate for pod
+            return d.type === 'policy' ? d.id : (d.id.substring(0, 10) + (d.id.length > 10 ? '...' : ''));
+        })
+        .on('mouseover', (event, d) => {
+            tooltip.html(d.id)
                 .style('visibility', 'visible')
                 .style('left', (event.pageX + 10) + 'px')
                 .style('top', (event.pageY - 10) + 'px');
-            })
-            .on('mouseout', () => {
-              tooltip.style('visibility', 'hidden');
-            });
+        })
+        .on('mouseout', () => {
+            tooltip.style('visibility', 'hidden');
+        });
 
     // Update positions on each tick
     simulation.on('tick', () => {
