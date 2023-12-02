@@ -88,3 +88,56 @@ func HandleVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode visualization data", http.StatusInternalServerError)
 	}
 }
+
+// gatherNamespacesWithPolicies returns a list of all namespaces that contain network policies.
+func GatherNamespacesWithPolicies() ([]string, error) {
+	clientset, err := GetClientset()
+	if err != nil {
+		return nil, err
+	}
+
+	// Retrieve all namespaces
+	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var namespacesWithPolicies []string
+
+	// Check each namespace for network policies
+	for _, ns := range namespaces.Items {
+		policies, err := clientset.NetworkingV1().NetworkPolicies(ns.Name).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Printf("Error listing policies in namespace %s: %v\n", ns.Name, err)
+			continue
+		}
+
+		if len(policies.Items) > 0 {
+			namespacesWithPolicies = append(namespacesWithPolicies, ns.Name)
+		}
+	}
+
+	return namespacesWithPolicies, nil
+}
+
+// gatherClusterVisualizationData retrieves visualization data for all namespaces with network policies.
+func GatherClusterVisualizationData() ([]VisualizationData, error) {
+	namespacesWithPolicies, err := GatherNamespacesWithPolicies()
+	if err != nil {
+		return nil, err
+	}
+
+	// Slice to hold the visualization data for the entire cluster
+	var clusterVizData []VisualizationData
+
+	for _, namespace := range namespacesWithPolicies {
+		vizData, err := gatherVisualizationData(namespace)
+		if err != nil {
+			log.Printf("Error gathering visualization data for namespace %s: %v\n", namespace, err)
+			continue
+		}
+		clusterVizData = append(clusterVizData, *vizData)
+	}
+
+	return clusterVizData, nil
+}

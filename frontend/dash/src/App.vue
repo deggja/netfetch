@@ -34,6 +34,7 @@
             {{ namespace }}
           </option>
         </select>
+        <button @click="generateClusterNetworkMap" class="scan-btn">Generate Network Map for Cluster</button>
       </div>
 
       <div class="message-container">
@@ -79,17 +80,37 @@
         <!-- Message for No Missing Policies -->
         <h2 v-else class="no-policies-message">No network policies missing. You are good to go!</h2>
       </div>
+    <!-- Loading visualization message -->
+    <div v-if="isLoadingVisualization" class="loading-message">
+        Loading visualization data...
+      </div>
+      
+      <!-- Conditional rendering based on isShowClusterMap -->
+    <div v-if="isShowClusterMap">
+      <!-- Render loading message or network map for the entire cluster -->
+      <div v-if="isLoadingVisualization" class="loading-message">Loading visualization data...</div>
+      <div v-else>
+        <div v-for="(vizData, namespace) in namespaceVisualizationData" :key="namespace">
+          <network-policy-visualization 
+            v-if="vizData.length > 0"
+            :policies="vizData">
+          </network-policy-visualization>
+        </div>
+      </div>
+    </div>
+      
+      <!-- Visualization components -->
+      <div v-else>
+        <div v-for="(vizData, namespace) in namespaceVisualizationData" :key="namespace">
+          <network-policy-visualization 
+            v-if="vizData.length > 0"
+            :policies="vizData">
+          </network-policy-visualization>
+        </div>
+      </div>
     </main>
   </div>
-  <div v-for="(vizData, namespace) in namespaceVisualizationData" :key="namespace">
-  <network-policy-visualization 
-    v-if="vizData.length > 0"
-    :policies="vizData">
-  </network-policy-visualization>
-</div>
 </template>
-
-
 
 <script>
 import axios from 'axios';
@@ -115,6 +136,9 @@ export default {
       allNamespaces: [],
       lastScanType: 'cluster',
       namespaceVisualizationData: {},
+      isLoadingVisualization: false,
+      isShowClusterMap: false,
+      clusterVisualizationData: [],
     };
   },
   watch: {
@@ -186,27 +210,29 @@ export default {
       this.menuVisible = !this.menuVisible;
     },
     async fetchScanResults() {
+    this.isShowClusterMap = false; // Add this line to hide the network map
     this.scanInitiated = true;
     this.lastScanType = 'cluster';
     try {
       const response = await axios.get('http://localhost:8080/scan');
       this.scanResults = response.data;
-      this.unprotectedPods = [];
       this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
       this.netfetchScore = response.data.Score;
       this.updateExpandedNamespaces();
-      const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
-      this.fetchVisualizationDataForNamespaces(Array.from(namespaces));
-      namespaces.forEach(namespace => {
-        this.expandedNamespaces, namespace, true;
-      });
-      this.fetchVisualizationData('');
-      this.fetchVisualizationDataForNamespaces(this.unprotectedPods.map(pod => pod.namespace));
+      this.namespaceVisualizationData = {};
     } catch (error) {
       console.error('Error fetching scan results:', error);
       }
-      this.updateExpandedNamespaces();
     },
+    async fetchNamespacesWithPolicies() {
+      try {
+        const response = await axios.get('http://localhost:8080/namespaces-with-policies');
+        return response.data.namespaces; // Assuming the API returns an array of namespace names
+      } catch (error) {
+        console.error('Error fetching namespaces with policies:', error);
+        return [];
+      }
+  },
     updateExpandedNamespaces() {
     const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
     namespaces.forEach(namespace => {
@@ -296,35 +322,36 @@ export default {
       this.lastScanType = 'namespace';
       this.scanInitiated = true;
       try {
-        const response = await axios.get(`http://localhost:8080/scan?namespace=${namespace}`);
-        this.scanResults = response.data;
-        if (response.data.UnprotectedPods && response.data.UnprotectedPods.length > 0) {
-          this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
-          this.netfetchScore = response.data.Score || null;
-          this.updateExpandedNamespaces();
+        const scanResponse = await axios.get(`http://localhost:8080/scan?namespace=${namespace}`);
+        this.scanResults = scanResponse.data;
+        if (scanResponse.data.UnprotectedPods && scanResponse.data.UnprotectedPods.length > 0) {
+          this.unprotectedPods = this.parseUnprotectedPods(scanResponse.data.UnprotectedPods);
+          this.netfetchScore = scanResponse.data.Score || null;
         } else {
           this.unprotectedPods = [];
-          this.netfetchScore = 42;
+          this.netfetchScore = 42; // Default score for no missing policies
         }
-        this.fetchVisualizationDataForNamespaces([namespace]);
+        this.updateExpandedNamespaces();
+
+        // Fetch visualization data only for the scanned namespace
+        await this.fetchVisualizationDataForNamespaces([namespace]);
       } catch (error) {
         console.error('Error scanning namespace:', namespace, error);
         this.message = { type: 'error', text: `Failed to scan namespace: ${namespace}. Error: ${error.message}` };
       }
     },
     // Fetch and update visualization data for multiple namespaces
-    fetchVisualizationDataForNamespaces(namespaces) {
+    async fetchVisualizationDataForNamespaces(namespaces) {
+      this.isLoadingVisualization = true;
       if (!Array.isArray(namespaces)) {
         console.error('Invalid namespaces array:', namespaces);
         return;
       }
-      namespaces.forEach(async (namespace) => {
+      for (const namespace of namespaces) {
         try {
           const response = await axios.get(`http://localhost:8080/visualization?namespace=${namespace}`);
-          console.log(response); // For debugging
-   
           if (response.data && Array.isArray(response.data.policies)) {
-            this.namespaceVisualizationData, namespace, response.data.policies;
+            this.namespaceVisualizationData[namespace] = response.data.policies;
           } else {
             this.namespaceVisualizationData, namespace, [];
           }
@@ -332,7 +359,8 @@ export default {
           console.error(`Error fetching visualization data for namespace ${namespace}:`, error);
           this.namespaceVisualizationData, namespace, [];
         }
-      });
+      }
+      this.isLoadingVisualization = false;
     },
     // Viz
     async fetchVisualizationData(namespace) {
@@ -348,6 +376,17 @@ export default {
         console.error('Error fetching visualization data:', error);
       }
     },
+    async generateClusterNetworkMap() {
+    this.isShowClusterMap = true;
+    this.isLoadingVisualization = true;
+    try {
+      const response = await axios.get('http://localhost:8080/visualization/cluster');
+      this.clusterVisualizationData = response.data;
+    } catch (error) {
+      console.error('Error fetching cluster visualization data:', error);
+    }
+    this.isLoadingVisualization = false;
+    }
   },
   mounted() {
       this.updateExpandedNamespaces();
@@ -588,5 +627,27 @@ export default {
     text-align: center;
     margin-top: 20px;
   }
+
+  .loading-message {
+  text-align: center;
+  padding: 20px;
+  font-size: 1.2em;
+  color: black;
+}
+
+.network-policy-visualization {
+  width: 80vw;
+  height: 60vh;
+  margin: 0 auto;
+  padding-top: 5px;
+  border: 2px solid #87CEEB;
+  border-radius: 5px;
+  background-color: #fff;
+   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
 </style>
 
