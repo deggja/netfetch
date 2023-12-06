@@ -203,15 +203,35 @@
 
     d3.select(this.$refs.vizContainer).selectAll('svg').remove();
 
+    // Setup zoom behavior
+    const zoom = d3.zoom()
+        .scaleExtent([0.1, 10])
+        .translateExtent([[-width, -height], [10 * width, 10 * height]]) // This should cover the zoomed area
+        .on('zoom', (event) => {
+            containerGroup.attr('transform', event.transform);
+        });
+
     // Create SVG element
     const svg = d3.select(this.$refs.vizContainer)
       .append('svg')
       .attr('width', '100%')
       .attr('height', '100%')
-      .attr('viewBox', `0 0 ${width} ${height}`);
+      .attr('viewBox', `0 0 ${width} ${height}`)
+
+    svg.call(zoom);
 
     const containerGroup = svg.append('g');
     const sizeFactor = 3;
+
+    if (this.visualizationType === 'cluster') {
+      const initialTransform = d3.zoomIdentity.translate(width / 8, height / 2.6).scale(0.7);
+      svg.call(zoom.transform, initialTransform);
+    }
+
+    if (this.visualizationType === 'namespace') {
+      const initialTransform = d3.zoomIdentity.translate(width / 8, height / 4).scale(1);
+      svg.call(zoom.transform, initialTransform);
+    }
 
     const adjustedClusterCenters = {};
     Object.keys(clusterCenters).forEach((cluster) => {
@@ -238,16 +258,40 @@
     return baseDistance + (clusterSize * additionalDistancePerNode);
   };
 
-    const ticked = () => {
+  const ticked = () => {
     // Apply containment force to nodes
     applyContainmentForce(nodes, clusterCenters, dynamicSizes, clusterNodeCounts);
 
     // Update the positions of the links
     link
-      .attr('x1', d => d.source.x)
-      .attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x)
-      .attr('y2', d => d.target.y);
+      .attr('x1', d => {
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const r = d.source.radius || 5; // Use the radius of the source node
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return d.source.x + (dx * r) / distance;
+      })
+      .attr('y1', d => {
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const r = d.source.radius || 5; // Use the radius of the source node
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return d.source.y + (dy * r) / distance;
+      })
+      .attr('x2', d => {
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const r = d.target.radius || 5; // Use the radius of the target node
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return d.target.x - (dx * r) / distance;
+      })
+      .attr('y2', d => {
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const r = d.target.radius || 5; // Use the radius of the target node
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return d.target.y - (dy * r) / distance;
+      });
 
     // Update the positions of the nodes
     node
@@ -258,7 +302,7 @@
     labels
       .attr('x', d => d.x)
       .attr('y', d => d.y);
-  };
+  }
 
     // Create the simulation with appropriate forces
     const simulation = d3.forceSimulation(nodes)
@@ -274,16 +318,24 @@
         .selectAll('circle')
         .data(nodes)
         .join('circle')
-        .attr('r', 5)
+        .attr('r', d => {
+          if (d.type === 'pod') {
+            return 5; // Radius for pods
+          } else if (d.type === 'policy') {
+            return 7.2; // Larger radius for policies
+          }
+          return 5; // Default radius
+        })
         .attr('fill', d => {
           if (d.type === 'pod') {
-            return '#28a745'; // Pods are green
+            return 'coral'; // Pods are green
           } else if (d.type === 'policy') {
-            return '#007bff'; // Policies are blue
+            return 'teal'; // Policies are blue
           }
-          // Default color if neither pod nor policy
-          return color(d.cluster); 
+          return color(d.cluster); // Default color
         })
+        .attr('stroke', 'grey')
+        .attr('stroke-width', 1.5)
         .call(drag(simulation));
 
     // Legends
@@ -293,7 +345,7 @@
 
     legendGroup.append('circle')
       .attr('r', 5)
-      .attr('fill', '#28a745')
+      .attr('fill', 'coral')
       .attr('cx', 0)
       .attr('cy', 0);
 
@@ -304,7 +356,7 @@
 
     legendGroup.append('circle')
       .attr('r', 5)
-      .attr('fill', '#007bff')
+      .attr('fill', 'teal')
       .attr('cx', 0)
       .attr('cy', 20);
 
@@ -313,20 +365,10 @@
       .attr('y', 25)
       .text('Policy');
 
-    // Setup zoom behavior
-    const zoom = d3.zoom()
-        .scaleExtent([0.1, 10])
-        .translateExtent([[-width, -height], [10 * width, 10 * height]]) // This should cover the zoomed area
-        .on('zoom', (event) => {
-            containerGroup.attr('transform', event.transform);
-        });
-
-        svg.call(zoom);
-
     // Create links and nodes inside the containerGroup
     const link = containerGroup.append('g')
-          .attr('stroke', '#999')
-          .attr('stroke-opacity', 0.6)
+          .attr('stroke', 'black')
+          .attr('stroke-opacity', 0.4)
           .selectAll('line')
           .data(links)
           .join('line')
@@ -451,17 +493,6 @@
   width: 100%;
   padding: 20px;
   height: 600px;
-}
-
-.cluster-boundary {
-  stroke-opacity: 0.6;
-  stroke-width: 1px;
-}
-
-.namespace-label {
-  font-size: 12px;
-  font-weight: bold;
-  font-family: 'Helvetica', sans-serif;
 }
 
 .tooltip {

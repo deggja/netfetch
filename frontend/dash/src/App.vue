@@ -15,7 +15,7 @@
       </ul>
             <!-- Toggle Button for Dark Mode at the bottom -->
       <div class="dark-mode-toggle-container" style="width: 100%; text-align: center; margin-top: 20px;">
-        <button @click="toggleDarkMode" class="dark-mode-toggle" style="width: 50px; height: 50px; background-color: #fff;">
+        <button @click="toggleDarkMode" class="dark-mode-toggle" style="width: 50px; height: 50px; background-color: #fff;" title="Dark mode coming soon" disabled>
           <!-- Inline SVG content -->
           <svg v-if ="!isDarkMode" xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 512 256.04" style="fill: currentColor;">
             <path d="M128.02 0h.18c22.03 0 42.83 5.66 61 15.6h210.38c30.89 0 59 12.65 79.38 33.04C499.35 68.99 512 97.1 512 128.02c0 30.92-12.66 59.03-33.02 79.4l-.42.38c-20.34 20.15-48.29 32.64-78.98 32.64H189.24c-18.17 9.93-38.98 15.6-61.04 15.6h-.18c-35.2 0-67.22-14.41-90.42-37.6C14.41 195.25 0 163.24 0 128.02s14.4-67.24 37.59-90.43l.91-.83C61.65 14.05 93.29 0 128.02 0zm-5.95 54.42c0-1.95.8-3.73 2.08-5 2.74-2.77 7.27-2.76 10.02-.01l.14.16a7.042 7.042 0 0 1 1.94 4.85v12.95c0 1.95-.8 3.73-2.08 5.01-2.75 2.75-7.27 2.75-10.02 0a7.084 7.084 0 0 1-2.08-5.01V54.42zm6.05 31.17c11.72 0 22.32 4.75 30 12.43 7.67 7.68 12.43 18.29 12.43 30 0 11.72-4.75 22.32-12.43 30s-18.28 12.43-30 12.43c-11.72 0-22.32-4.75-30.01-12.43-7.67-7.68-12.43-18.28-12.43-30 0-11.72 4.76-22.32 12.43-30 7.69-7.67 18.3-12.43 30.01-12.43zm-56.33-5.34a7.114 7.114 0 0 1-2.07-5.01c0-3.9 3.18-7.09 7.09-7.09 1.81 0 3.62.69 5 2.07l9.16 9.16a7.065 7.065 0 0 1 2.08 5.01c0 1.8-.7 3.62-2.08 5.01a7.057 7.057 0 0 1-5.01 2.08c-1.8 0-3.61-.7-5-2.07l-9.17-9.16zm-17.28 53.81c-1.95 0-3.73-.8-5-2.08-2.77-2.74-2.76-7.27-.01-10.01l.15-.14a7.04 7.04 0 0 1 4.86-1.94h12.94a7.082 7.082 0 0 1 7.09 7.09c0 1.95-.8 3.73-2.07 5.01a7.099 7.099 0 0 1-5.02 2.07H54.51zm25.82 50.28a7.049 7.049 0 0 1-5 2.07c-3.91 0-7.09-3.16-7.09-7.08 0-1.81.68-3.62 2.07-5.01l9.31-9.29a7.02 7.02 0 0 1 4.86-1.94 7.09 7.09 0 0 1 7.09 7.09c0 1.79-.69 3.6-2.08 4.99l-9.16 9.17zm53.82 17.29c0 1.94-.8 3.73-2.08 5-2.74 2.76-7.27 2.75-10.02 0l-.13-.15a7.033 7.033 0 0 1-1.94-4.85v-12.95c0-1.96.8-3.73 2.07-5.01 2.76-2.75 7.27-2.75 10.03 0a7.1 7.1 0 0 1 2.07 5.01v12.95zm50.28-25.83a7.055 7.055 0 0 1 2.07 5.01c0 3.89-3.18 7.09-7.08 7.09-1.81 0-3.63-.69-5.01-2.07l-9.16-9.16a7.095 7.095 0 0 1-2.07-5.02c0-3.9 3.18-7.09 7.08-7.09 1.8 0 3.61.7 5 2.08l9.17 9.16zm17.29-53.82c1.93 0 3.73.81 5 2.08 2.76 2.75 2.75 7.27 0 10.02l-.15.14a7.098 7.098 0 0 1-4.85 1.94h-12.95c-1.96 0-3.74-.8-5.01-2.08-2.76-2.75-2.76-7.27 0-10.02a7.049 7.049 0 0 1 5.01-2.08h12.95zM175.89 71.7a7.074 7.074 0 0 1 5-2.07c3.9 0 7.1 3.19 7.1 7.09 0 1.81-.69 3.62-2.07 5l-9.32 9.31a7.12 7.12 0 0 1-4.86 1.93c-3.91 0-7.09-3.18-7.09-7.09 0-1.8.7-3.61 2.08-5l9.16-9.17zm34.17-41.87c2.96 2.47 5.81 5.07 8.53 7.8 23.22 23.15 37.63 55.17 37.63 90.39s-14.42 67.23-37.6 90.42a130.2 130.2 0 0 1-8.5 7.77h189.46c26.83 0 51.24-10.91 69.02-28.5l.32-.35c17.79-17.79 28.85-42.35 28.85-69.34 0-26.99-11.06-51.55-28.85-69.35-17.77-17.8-42.33-28.84-69.34-28.84H210.06zm-82.04-14.71h.18c62.09 0 112.89 50.81 112.89 112.9 0 62.1-50.86 112.9-112.89 112.9h-.18c-62.03 0-112.9-50.8-112.9-112.9 0-62.09 50.81-112.9 112.9-112.9z"/>
@@ -90,10 +90,13 @@
         </section>
 
         <!-- Message for No Missing Policies -->
-        <h2 v-else class="no-policies-message">No network policies missing. You are good to go!</h2>
+        <h2 v-if="scanInitiated && unprotectedPods.length === 0 && !isShowClusterMap" class="no-policies-message">
+          All good!
+          No unproteced pods found.
+        </h2>
       </div>
 
-    <!-- Loading visualization message -->
+    <!-- Loading visualization message --> 
     <div v-if="isLoadingVisualization" class="loading-message">
       {{ loadingMessage }}
     </div>
@@ -451,7 +454,7 @@ export default {
 }
 
 body, html {
-  background-color: #f5f5f5;
+  background-color: white;
   color: #333;
 }
 
@@ -513,7 +516,7 @@ body, html {
 .score-container {
   width: 100px;
   height: 100px;
-  border: 5px solid #87CEEB;
+  border: 8px solid #87CEEB;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -544,7 +547,7 @@ text-align: center;
 
 .scan-btn {
   padding: 10px 20px;
-  border: 2px solid #87CEEB;
+  border: 1px solid #87CEEB;
   border-radius: 5px;
   background-color: #fff;
   cursor: pointer;
@@ -588,7 +591,6 @@ text-align: center;
 /* Table container */
 .table-container {
   background-color: #fff;
-  border: 2px solid #87CEEB;
   padding: 20px;
   border-radius: 1px;
   width: 100%;
@@ -699,8 +701,9 @@ color: black;
 /* Dark Mode Specific Styles */
 .dark-mode-toggle-container {
   position: absolute;
-  bottom: 20px;
+  bottom: 1px;
   left: 20px;
+  margin-top: auto;
 }
 
 .dark-mode-toggle {
@@ -741,6 +744,87 @@ color: black;
   fill: #555;
 }
 
+/* Dark Mode Specific Styles */
+.app-container.dark-mode {
+  background-color: #000; /* Black background for the entire app */
+  color: #fff; /* White text color for the entire app */
+}
+
+.app-container.dark-mode .sidebar {
+  background-color: #1a1a1a; /* Slightly lighter black for sidebar */
+  color: #fff; /* White text for sidebar */
+}
+
+.app-container.dark-mode .menu-item a {
+  color: #fff; /* White text for menu items */
+}
+
+.app-container.dark-mode .menu-item a.active {
+  background-color: #333; /* Darker background for active menu item */
+}
+
+.app-container.dark-mode .content {
+  color: #fff; /* White text for main content */
+}
+
+.app-container.dark-mode .header {
+  color: #fff; /* White text for header */
+}
+
+.app-container.dark-mode .score-container {
+  border: 5px solid #444; /* Dark border for score container */
+}
+
+.app-container.dark-mode .buttons .scan-btn {
+  border: 2px solid #444; /* Dark border for buttons */
+  color: #fff; /* White text for buttons */
+}
+
+.app-container.dark-mode .buttons .scan-btn:hover {
+  background-color: #333; /* Darker background on hover for buttons */
+}
+
+.app-container.dark-mode .message-container .success-message,
+.app-container.dark-mode .message-container .error-message {
+  color: #fff; /* White text for messages */
+}
+
+.app-container.dark-mode .table-container {
+  background-color: #1a1a1a; /* Slightly lighter black for table container */
+  color: #fff; /* White text for table */
+}
+
+.app-container.dark-mode .pods-table th,
+.app-container.dark-mode .pods-table td {
+  border: 1px solid #444; /* Dark border for table cells */
+}
+
+.app-container.dark-mode .pods-table th {
+  background-color: #333; /* Dark background for table header */
+}
+
+.app-container.dark-mode .remediate-btn {
+  background-color: #333; /* Dark background for remediate button */
+}
+
+.app-container.dark-mode .pagination-controls .pagination-btn {
+  border: 1px solid #444; /* Dark border for pagination buttons */
+}
+
+.app-container.dark-mode .network-policy-visualization {
+  border: 2px solid #444; /* Dark border for visualization */
+  background-color: #1a1a1a; /* Slightly lighter black for visualization */
+}
+
+/* Adjust toggle button appearance in dark mode */
+.app-container.dark-mode .dark-mode-toggle {
+  background-color: #333; /* Dark background for toggle button */
+  color: #fff; /* White icon color */
+}
+
+.app-container.dark-mode .dark-mode-toggle:hover {
+  background-color: #444; /* Slightly lighter black on hover for toggle button */
+}
 
 </style>
 
