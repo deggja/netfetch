@@ -6,40 +6,30 @@
   import * as d3 from 'd3';
 
   // Define the custom cluster force
-  function forceCluster(centers) {
-    let nodes;
-    let strength = 0.1;
+  function forceCluster(centers, nodeCounts) {
+  let nodes;
+  let strength = 0.1;
 
-    function force(alpha) {
-      const l = alpha * strength;
-      nodes.forEach(node => {
-        const center = centers[node.cluster];
-        if (center) {
-          node.vx -= (node.x - center.x) * l;
-          node.vy -= (node.y - center.y) * l;
-        }
-      });
+  function force(alpha) {
+    const l = alpha * strength;
+    for (const node of nodes) {
+      const center = centers[node.cluster];
+      const count = nodeCounts[node.cluster] || 1;
+      node.vx -= (node.x - center.x) * l / count;
+      node.vy -= (node.y - center.y) * l / count;
     }
-
-    force.initialize = function(_) {
-      nodes = _;
-    };
-
-    force.strength = function(_) {
-      if (typeof _ === 'number') {
-        strength = _;
-      } else {
-        const clusterNodeCount = {};
-        nodes.forEach(node => {
-          strength = Math.min(1, 10 / (clusterNodeCount[node.cluster] || 1));
-        });
-      }
-      return force;
-    };
-
-    return force;
   }
 
+  force.initialize = function(_) {
+    nodes = _;
+  };
+
+  force.strength = function(_) {
+    return arguments.length ? (strength = +_, force) : strength;
+  };
+
+  return force;
+}
 
   export default {
   name: 'NetworkPolicyVisualization',
@@ -55,7 +45,11 @@
     },
   },
   mounted() {
-    this.createNetworkMap();
+    try {
+      this.createNetworkMap();
+    } catch (error) {
+      console.error("An error occurred during mounted hook:", error);
+    }
   },
   methods: {
     createNetworkMap() {
@@ -81,10 +75,9 @@
     const namespaceClusterMap = new Map();
 
     // Group policies by namespace and prepare nodes and links
-    let clusterIndex = 0;
     data.forEach(policy => {
       if (!namespaceClusterMap.has(policy.namespace)) {
-        namespaceClusterMap.set(policy.namespace, clusterIndex++);
+        namespaceClusterMap.set(policy.namespace, policy.namespace);
       }
       const namespaceCluster = namespaceClusterMap.get(policy.namespace);
 
@@ -100,10 +93,27 @@
       });
     });
 
-    const clusterNodeCounts = nodes.reduce((counts, node) => {
-      counts[node.cluster] = (counts[node.cluster] || 0) + 1;
-      return counts;
+    const clusterNodeCounts = nodes.reduce((acc, node) => {
+        acc[node.cluster] = (acc[node.cluster] || 0) + 1;
+        return acc;
     }, {});
+
+    const namespaceSizes = data.reduce((sizes, policy) => {
+      sizes[policy.namespace] = (sizes[policy.namespace] || 0) + policy.targetPods.length;
+      return sizes;
+    }, {});
+
+    const dynamicSizes = calculateDynamicSectionSizes(namespaceSizes);
+    const dynamicPositions = calculateDynamicSectionPositions(dynamicSizes, width, height);
+
+    console.log('Dynamic Sizes:', dynamicSizes);
+    console.log('Dynamic Positions:', dynamicPositions);
+
+    // Now, you can use dynamicPositions to set your cluster centers
+    const clusterCenters = {};
+    Object.keys(dynamicPositions).forEach(namespace => {
+      clusterCenters[namespace] = dynamicPositions[namespace];
+    });
 
     // Tooltip for full text display
     const tooltip = d3.select('body').append('div')
@@ -115,22 +125,71 @@
           .style('padding', '5px')
           .style('pointer-events', 'none');
 
-    // Calculate cluster centers
-    const gridColumns = Math.ceil(Math.sqrt(namespaceClusterMap.size));
-    const gridRows = Math.ceil(namespaceClusterMap.size / gridColumns);
-    const sectionWidth = width / gridColumns;
-    const sectionHeight = height / gridRows;
-    const boundaryPadding = Math.min(sectionWidth, sectionHeight) / 4;
+    // Calculate cluster centers dynamically.
+    const gridSizeMultiplier = 1.2;
+    const gridSize = Math.ceil(Math.sqrt(namespaceClusterMap.size) * gridSizeMultiplier);
+    const sectionWidth = width / gridSize;
+    const sectionHeight = height / gridSize;
 
-    const clusterCenters = {};
     const namespaces = Array.from(namespaceClusterMap.keys());
     namespaces.forEach((namespace, index) => {
-      const columnIndex = index % gridColumns;
-      const rowIndex = Math.floor(index / gridColumns);
-      const x = columnIndex * sectionWidth + sectionWidth / 2;
-      const y = rowIndex * sectionHeight + sectionHeight / 2;
+      const row = Math.floor(index / gridSize);
+      const col = index % gridSize;
+      const x = col * sectionWidth + sectionWidth / 2;
+      const y = row * sectionHeight + sectionHeight / 2;
       clusterCenters[namespaceClusterMap.get(namespace)] = { x, y };
     });
+
+    function calculateDynamicSectionSizes(namespaceSizes) {
+    const dynamicSizes = {};
+    const padding = 50; // Increase padding for more space
+    for (const namespace in namespaceSizes) {
+      const size = namespaceSizes[namespace];
+      // Increase the arbitrary scaling factor, add padding, and ensure a minimum size
+      dynamicSizes[namespace] = {
+        width: Math.max(Math.sqrt(size) * 15 + padding, 200), // Increase the minimum size if necessary
+        height: Math.max(Math.sqrt(size) * 15 + padding, 100)
+      };
+    }
+    return dynamicSizes;
+  }
+
+  function calculateDynamicSectionPositions(dynamicSizes, width, height) {
+    const positions = {};
+    let i = 0;
+    for (const namespace in dynamicSizes) {
+      // Use namespace directly instead of index
+      const x = (i % 10) * (width / 10) + dynamicSizes[namespace].width / 2;
+      const y = Math.floor(i / 10) * (height / 10) + dynamicSizes[namespace].height / 2;
+      positions[namespace] = { x, y };
+      i++;
+    }
+    return positions;
+  }
+
+  function applyContainmentForce(nodes, clusterCenters, dynamicSizes, clusterNodeCounts) {
+    // Iterate over each node and apply containment logic
+    nodes.forEach(node => {
+      const center = clusterCenters[node.cluster];
+      const size = dynamicSizes[node.cluster];
+      const count = clusterNodeCounts[node.cluster] || 1;
+
+      // Calculate the radius based on the number of nodes and the size of the section
+      const radius = Math.sqrt(count) * (size.width / 2);
+
+      // Calculate the distance from the node to the cluster center
+      const dx = node.x - center.x;
+      const dy = node.y - center.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // If the node is outside the cluster radius, bring it back to the boundary
+      if (distance > radius) {
+        const angle = Math.atan2(dy, dx);
+        node.x = center.x + Math.cos(angle) * radius;
+        node.y = center.y + Math.sin(angle) * radius;
+      }
+    });
+  }
 
     // Assign initial positions
     nodes.forEach(node => {
@@ -152,64 +211,85 @@
       .attr('viewBox', `0 0 ${width} ${height}`);
 
     const containerGroup = svg.append('g');
+    const sizeFactor = 3;
 
-    function drawClusterBoundaries() {
-      containerGroup.selectAll('.cluster-boundary')
-        .data(namespaces)
-        .enter().append('rect')
-        .attr('class', 'cluster-boundary')
-        .attr('x', d => clusterCenters[namespaceClusterMap.get(d)].x - boundaryPadding / 2)
-        .attr('y', d => clusterCenters[namespaceClusterMap.get(d)].y - boundaryPadding / 2)
-        .attr('width', boundaryPadding)
-        .attr('height', boundaryPadding)
-        .attr('fill', 'none')
-        .attr('stroke', '#ccc')
-        .attr('stroke-dasharray', '4');
-      }
-
-    drawClusterBoundaries();
-
-    createNamespaceLabels(containerGroup, namespaces, clusterCenters, namespaceClusterMap);
-
-    // Console log for debugging
-    console.log("Nodes before simulation:", nodes);
-    console.log("Links:", links);
-    console.log("Cluster Centers:", clusterCenters);
+    const adjustedClusterCenters = {};
+    Object.keys(clusterCenters).forEach((cluster) => {
+      const namespaceSize = namespaceSizes[cluster];
+      const offsetX = (namespaceSize * sizeFactor) / 2;
+      const offsetY = (namespaceSize * sizeFactor) / 2;
+      adjustedClusterCenters[cluster] = {
+        x: clusterCenters[cluster].x + offsetX,
+        y: clusterCenters[cluster].y + offsetY
+      };
+    });
 
     const nodeRadius = 10;
-    const collisionRadius = nodeRadius * 1.2;
+    const collisionRadius = d => {
+      const clusterSize = clusterNodeCounts[d.cluster] || 1;
+      return nodeRadius + (clusterSize * 0.5);
+    };
 
     const linkDistance = (d) => {
     const clusterSize = clusterNodeCounts[d.source.cluster] || 1;
-    const baseDistance = 50;
-    const additionalDistancePerNode = 10;
-    
+    const baseDistance = 30;
+    const additionalDistancePerNode = 8.5;
+
     return baseDistance + (clusterSize * additionalDistancePerNode);
+  };
+
+    const ticked = () => {
+    // Apply containment force to nodes
+    applyContainmentForce(nodes, clusterCenters, dynamicSizes, clusterNodeCounts);
+
+    // Update the positions of the links
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+
+    // Update the positions of the nodes
+    node
+      .attr('cx', d => d.x)
+      .attr('cy', d => d.y);
+
+    // Update label positions, if applicable
+    labels
+      .attr('x', d => d.x)
+      .attr('y', d => d.y);
   };
 
     // Create the simulation with appropriate forces
     const simulation = d3.forceSimulation(nodes)
       .force('link', d3.forceLink(links).id(d => d.id).distance(linkDistance))
       .force('charge', d3.forceManyBody().strength(-50))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collide', d3.forceCollide(collisionRadius).strength(1))
-      .force('cluster', forceCluster(clusterCenters).strength(0.8))
-      .force('x', d3.forceX().x(d => clusterCenters[d.cluster].x).strength(0.5))
-      .force('y', d3.forceY().y(d => clusterCenters[d.cluster].y).strength(0.5));
+      .force('collide', d3.forceCollide().radius(d => collisionRadius(d) + 30).iterations(2))
+      .force('x', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.1))
+      .force('y', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.1))
+      .force('cluster', forceCluster(clusterCenters, clusterNodeCounts).strength(0.5))
+      .on('tick', ticked);
 
-    const node = containerGroup.append('g')
-      .selectAll('circle')
-      .data(nodes)
-      .join('circle')
-      .attr('r', 5)
-      .attr('fill', d => color(namespaceClusterMap.get(d.namespace)))
-      .call(drag(simulation));
-
+      const node = containerGroup.append('g')
+        .selectAll('circle')
+        .data(nodes)
+        .join('circle')
+        .attr('r', 5)
+        .attr('fill', d => {
+          if (d.type === 'pod') {
+            return '#28a745'; // Pods are green
+          } else if (d.type === 'policy') {
+            return '#007bff'; // Policies are blue
+          }
+          // Default color if neither pod nor policy
+          return color(d.cluster); 
+        })
+        .call(drag(simulation));
 
     // Legends
     const legendGroup = svg.append('g')
       .attr('class', 'legend')
-      .attr('transform', 'translate(10, 20)');
+      .attr('transform', 'translate(-20, 10)');
 
     legendGroup.append('circle')
       .attr('r', 5)
@@ -218,7 +298,7 @@
       .attr('cy', 0);
 
     legendGroup.append('text')
-      .attr('x', 10)
+      .attr('x', 20)
       .attr('y', 5)
       .text('Pod');
 
@@ -229,14 +309,14 @@
       .attr('cy', 20);
 
     legendGroup.append('text')
-      .attr('x', 10)
+      .attr('x', 20)
       .attr('y', 25)
       .text('Policy');
 
     // Setup zoom behavior
     const zoom = d3.zoom()
         .scaleExtent([0.1, 10])
-        .translateExtent([[-width, -height], [2 * width, 2 * height]]) // This should cover the zoomed area
+        .translateExtent([[-width, -height], [10 * width, 10 * height]]) // This should cover the zoomed area
         .on('zoom', (event) => {
             containerGroup.attr('transform', event.transform);
         });
@@ -275,17 +355,19 @@
         });
 
         simulation.on('tick', () => {
-          const padding = boundaryPadding / 2;
-          // Keep nodes within the boundaries
+          // Keep nodes within the circular boundaries
           nodes.forEach(node => {
             const center = clusterCenters[node.cluster];
-            if (!center) {
-              console.error('No center found for node', node);
-              return; // Skip this node to avoid errors
+            const radius = Math.sqrt(clusterNodeCounts[node.cluster] || 1) * (dynamicSizes[node.cluster].width / 2); // Calculate radius
+            const dx = node.x - center.x;
+            const dy = node.y - center.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > radius) {
+              // If node is outside the radius, bring it back to the edge of the circle
+              node.x = center.x + (dx / distance) * radius;
+              node.y = center.y + (dy / distance) * radius;
             }
-            // Ensure nodes are within the boundary minus the padding
-            node.x = Math.max(center.x - padding, Math.min(center.x + padding, node.x));
-            node.y = Math.max(center.y - padding, Math.min(center.y + padding, node.y));
           });
 
           // Update link positions, checking for NaN values
@@ -305,8 +387,14 @@
             .attr('x', d => isNaN(d.x) ? 0 : d.x)
             .attr('y', d => isNaN(d.y) ? 0 : d.y);
         });
-
-
+        
+        svg.append('text')
+          .attr('x', width - 160)
+          .attr('y', height - 10)
+          .text('Drag to move, scroll to zoom.')
+          .style('font-size', '15px')
+          .style('fill', 'black');
+    
     // Drag functionality
     function drag(simulation) {
       function dragstarted(event) {
@@ -331,22 +419,6 @@
           .on('drag', dragged)
           .on('end', dragended);
           }
-
-      function createNamespaceLabels() {
-        containerGroup.selectAll('.namespace-label')
-          .data(namespaces)
-          .enter().append('text')
-          .attr('class', 'namespace-label')
-          .attr('x', d => clusterCenters[namespaceClusterMap.get(d)].x)
-          .attr('y', d => clusterCenters[namespaceClusterMap.get(d)].y - boundaryPadding / 2)
-          .attr('text-anchor', 'middle')
-          .attr('fill', '#555')
-          .text(d => d)
-          .attr('font-size', '12px')
-          .attr('font-weight', 'bold');
-        }
-
-        createNamespaceLabels();
       },
     },
     watch: {
@@ -389,16 +461,18 @@
 .namespace-label {
   font-size: 12px;
   font-weight: bold;
+  font-family: 'Helvetica', sans-serif;
 }
 
 .tooltip {
-    position: absolute;
-    visibility: hidden;
-    background: white;
-    border: 1px solid black;
-    padding: 5px;
-    pointer-events: none;
-    z-index: 10;
-  }
+  position: absolute;
+  visibility: hidden;
+  background: white;
+  border: 1px solid black;
+  padding: 5px;
+  pointer-events: none;
+  z-index: 10;
+}
+
 </style>
   
