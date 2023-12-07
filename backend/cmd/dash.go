@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	_ "github.com/deggja/netfetch/backend/statik"
 	"github.com/rakyll/statik/fs"
@@ -27,6 +30,19 @@ func init() {
 }
 
 func startDashboardServer() {
+	// Verify connection to cluster or throw error
+	clientset, err := k8s.GetClientset()
+	if err != nil {
+		log.Fatalf("You are not connected to a Kubernetes cluster. Please connect to a cluster and re-run the command: %v", err)
+		return
+	}
+
+	_, err = clientset.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatalf("You are not connected to a Kubernetes cluster. Please connect to a cluster and re-run the command: %v", err)
+		return
+	}
+
 	// Set up CORS
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"http://localhost:8081"},
