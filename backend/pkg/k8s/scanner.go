@@ -74,6 +74,7 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 	var namespacesToScan []string
 	var kubeconfig string
 
+	unprotectedPodsCount := 0
 	scanResult := new(ScanResult)
 
 	writer := bufio.NewWriter(&output)
@@ -165,15 +166,16 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 			for _, pod := range allPods.Items {
 				if !coveredPods[pod.Name] {
 					podDetail := fmt.Sprintf("%s %s %s", nsName, pod.Name, pod.Status.PodIP)
-					// Prevent adding duplicate pod details in UnprotectedPods
 					if !containsPodDetail(scanResult.UnprotectedPods, podDetail) {
 						unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
+						unprotectedPodsCount++
 					}
 				}
 			}
 
 			if len(unprotectedPodDetails) > 0 {
 				missingPoliciesOrUncoveredPods = true
+				scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
 				if !isCLI {
 					if !contains(scanResult.DeniedNamespaces, nsName) {
 						scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
@@ -240,10 +242,12 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 		}
 	}
 
-	// Calculate the final score after scanning all namespaces
-	finalScore := calculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, len(deniedNamespaces))
-	fmt.Printf("\nYour Netfetch security score is: %d/42\n", finalScore)
+	score := calculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
 
+	// Update the score in scanResult
+	scanResult.Score = score
+
+	// Print the final score and other relevant messages only once, here at the end
 	if policyChangesMade {
 		fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
 	}
@@ -261,10 +265,10 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 	} else {
 		printToBoth(writer, "\nNo network policies missing. You are good to go!\n")
 	}
-	// Calculate the score
-	score := calculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, len(deniedNamespaces))
-	// Set the score in scanResult
-	scanResult.Score = score
+
+	// Print the final score
+	fmt.Printf("\nYour Netfetch security score is: %d/42\n", score)
+
 	return scanResult, nil
 }
 
@@ -332,7 +336,6 @@ func isSystemNamespace(namespace string) bool {
 
 // Scoring logic
 func calculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int) int {
-	// Simple scoring logic - can be more complex based on requirements
 	score := 42 // Start with the highest score
 
 	if !hasPolicies {
