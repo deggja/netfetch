@@ -29,8 +29,6 @@ Before you begin, ensure you have the following:
 
 ### Usage
 
-![](https://raw.githubusercontent.com/deggja/netfetch/main/frontend/dash/src/assets/netfetch_clI_scan.gif)
-
 The primary command provided by `netfetch` is `scan`. This command scans all non-system Kubernetes namespaces for network policies.
 
 You can also scan specific namespaces by specifying the name of that namespace.
@@ -53,11 +51,7 @@ Launch dashboard.
 netfetch dash
 ```
 
-## Screenshots
-
 ![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_new_dash.png)
-
-![Netfetch Map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_map.png)
 
 
 ## Netfetch score
