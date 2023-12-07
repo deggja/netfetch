@@ -29,7 +29,7 @@ Before you begin, ensure you have the following:
 
 ### Usage
 
-![](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_cli_scan.gif)
+![](https://raw.githubusercontent.com/deggja/netfetch/main/frontend/dash/src/assets/netfetch_clI_scan.gif)
 
 The primary command provided by `netfetch` is `scan`. This command scans all non-system Kubernetes namespaces for network policies.
 
