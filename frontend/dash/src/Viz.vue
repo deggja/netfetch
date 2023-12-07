@@ -94,7 +94,7 @@
     });
 
     const clusterNodeCounts = nodes.reduce((acc, node) => {
-        acc[node.cluster] = (acc[node.cluster] || 0) + 1;
+        acc[node.cluster] = (acc[node.cluster] || 5) + 1;
         return acc;
     }, {});
 
@@ -142,13 +142,13 @@
 
     function calculateDynamicSectionSizes(namespaceSizes) {
     const dynamicSizes = {};
-    const padding = 50; // Increase padding for more space
+    const padding = 50;
     for (const namespace in namespaceSizes) {
       const size = namespaceSizes[namespace];
       // Increase the arbitrary scaling factor, add padding, and ensure a minimum size
       dynamicSizes[namespace] = {
-        width: Math.max(Math.sqrt(size) * 15 + padding, 200), // Increase the minimum size if necessary
-        height: Math.max(Math.sqrt(size) * 15 + padding, 100)
+        width: Math.max(Math.sqrt(size) * 20 + padding, 200), // Increase the minimum size if necessary
+        height: Math.max(Math.sqrt(size) * 20 + padding, 200)
       };
     }
     return dynamicSizes;
@@ -224,7 +224,7 @@
     const sizeFactor = 3;
 
     if (this.visualizationType === 'cluster') {
-      const initialTransform = d3.zoomIdentity.translate(width / 8, height / 2.6).scale(0.7);
+      const initialTransform = d3.zoomIdentity.translate(width / 8, height / 2.6).scale(0.3);
       svg.call(zoom.transform, initialTransform);
     }
 
@@ -247,13 +247,13 @@
     const nodeRadius = 10;
     const collisionRadius = d => {
       const clusterSize = clusterNodeCounts[d.cluster] || 1;
-      return nodeRadius + (clusterSize * 0.5);
+      return nodeRadius + (clusterSize * 0.6);
     };
 
     const linkDistance = (d) => {
     const clusterSize = clusterNodeCounts[d.source.cluster] || 1;
     const baseDistance = 30;
-    const additionalDistancePerNode = 8.5;
+    const additionalDistancePerNode = 1.5;
 
     return baseDistance + (clusterSize * additionalDistancePerNode);
   };
@@ -267,32 +267,32 @@
       .attr('x1', d => {
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
-        const r = d.source.radius || 5; // Use the radius of the source node
+        const r = d.source.radius || 5;
         const distance = Math.sqrt(dx * dx + dy * dy);
         return d.source.x + (dx * r) / distance;
       })
       .attr('y1', d => {
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
-        const r = d.source.radius || 5; // Use the radius of the source node
+        const r = d.source.radius || 5;
         const distance = Math.sqrt(dx * dx + dy * dy);
         return d.source.y + (dy * r) / distance;
       })
       .attr('x2', d => {
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
-        const r = d.target.radius || 5; // Use the radius of the target node
+        const r = d.target.radius || 5;
         const distance = Math.sqrt(dx * dx + dy * dy);
         return d.target.x - (dx * r) / distance;
       })
       .attr('y2', d => {
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
-        const r = d.target.radius || 5; // Use the radius of the target node
+        const r = d.target.radius || 5;
         const distance = Math.sqrt(dx * dx + dy * dy);
         return d.target.y - (dy * r) / distance;
       });
-
+      
     // Update the positions of the nodes
     node
       .attr('cx', d => d.x)
@@ -307,11 +307,11 @@
     // Create the simulation with appropriate forces
     const simulation = d3.forceSimulation(nodes)
       .force('link', d3.forceLink(links).id(d => d.id).distance(linkDistance))
-      .force('charge', d3.forceManyBody().strength(-50))
-      .force('collide', d3.forceCollide().radius(d => collisionRadius(d) + 30).iterations(2))
+      .force('charge', d3.forceManyBody().strength(-100))
+      .force('collide', d3.forceCollide().radius(d => collisionRadius(d) + 35).iterations(6))
       .force('x', d3.forceX(d => clusterCenters[d.cluster].x).strength(0.1))
       .force('y', d3.forceY(d => clusterCenters[d.cluster].y).strength(0.1))
-      .force('cluster', forceCluster(clusterCenters, clusterNodeCounts).strength(0.5))
+      .force('cluster', forceCluster(clusterCenters, clusterNodeCounts).strength(0.2))
       .on('tick', ticked);
 
       const node = containerGroup.append('g')
@@ -431,16 +431,16 @@
         });
         
         svg.append('text')
-          .attr('x', width - 160)
+          .attr('x', width - 200)
           .attr('y', height - 10)
           .text('Drag to move, scroll to zoom.')
-          .style('font-size', '15px')
+          .style('font-size', '18px')
           .style('fill', 'black');
     
     // Drag functionality
     function drag(simulation) {
       function dragstarted(event) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
+        if (!event.active) simulation.alphaTarget(0.1).restart();
         event.subject.fx = event.subject.x;
         event.subject.fy = event.subject.y;
       }
