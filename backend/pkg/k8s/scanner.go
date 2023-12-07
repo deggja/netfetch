@@ -5,8 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -38,6 +41,33 @@ type ScanResult struct {
 	Score              int
 }
 
+// Check if kubeconfig exists and is not empty
+func kubeconfigExists(kubeconfigPath string) bool {
+	info, err := os.Stat(kubeconfigPath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir() && info.Size() > 0
+}
+
+// Check if error scanning is related to network issues
+func isNetworkError(err error) bool {
+	var urlError *url.Error
+	var netOpError *net.OpError
+	var dnsError *net.DNSError
+
+	if errors.As(err, &urlError) {
+		if errors.As(urlError.Err, &netOpError) {
+			if errors.As(netOpError.Err, &dnsError) {
+				if dnsError.IsNotFound {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // ScanNetworkPolicies scans namespaces for network policies
 func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool) (*ScanResult, error) {
 	var output bytes.Buffer
@@ -53,6 +83,10 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
+		if !kubeconfigExists(kubeconfig) {
+			fmt.Println("It appears you are not connected to a Kubernetes cluster. Please check your kubeconfig.")
+			return nil, err
+		}
 		fmt.Printf("Error building kubeconfig: %s\n", err)
 		return nil, err
 	}
@@ -68,7 +102,11 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 	} else {
 		allNamespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			fmt.Printf("Error listing namespaces: %s\n", err)
+			if isNetworkError(err) {
+				fmt.Println("You are not connected to a Kubernetes cluster. Please connect to a cluster and re-run the command.")
+			} else {
+				fmt.Printf("Error listing namespaces: %s\n", err)
+			}
 			return nil, err
 		}
 		for _, ns := range allNamespaces.Items {
@@ -89,7 +127,7 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 		if err != nil {
 			errorMsg := fmt.Sprintf("\nError listing network policies in namespace %s: %s\n", nsName, err)
 			printToBoth(writer, errorMsg)
-			continue
+			return nil, errors.New(errorMsg)
 		}
 
 		hasDenyAll := hasDefaultDenyAllPolicy(policies.Items)
