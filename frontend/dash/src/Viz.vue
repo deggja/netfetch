@@ -259,46 +259,43 @@
   };
 
   const ticked = () => {
-    // Apply containment force to nodes
-    applyContainmentForce(nodes, clusterCenters, dynamicSizes, clusterNodeCounts);
+  // Apply containment force to nodes
+  applyContainmentForce(nodes, clusterCenters, dynamicSizes, clusterNodeCounts);
 
-    // Update the positions of the links
-    link
-      .attr('x1', d => {
-        const dx = d.target.x - d.source.x;
-        const dy = d.target.y - d.source.y;
-        const r = d.source.radius || 5;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return d.source.x + (dx * r) / distance;
-      })
-      .attr('y1', d => {
-        const dx = d.target.x - d.source.x;
-        const dy = d.target.y - d.source.y;
-        const r = d.source.radius || 5;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return d.source.y + (dy * r) / distance;
-      })
-      .attr('x2', d => {
-        const dx = d.target.x - d.source.x;
-        const dy = d.target.y - d.source.y;
-        const r = d.target.radius || 5;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return d.target.x - (dx * r) / distance;
-      })
-      .attr('y2', d => {
-        const dx = d.target.x - d.source.x;
-        const dy = d.target.y - d.source.y;
-        const r = d.target.radius || 5;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return d.target.y - (dy * r) / distance;
-      });
+  link
+    .attr('x1', d => {
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const sourceRadius = d.source.type === 'pod' ? 5 : 7.2;
+      return d.source.x + (dx * sourceRadius) / distance;
+    })
+    .attr('y1', d => {
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const sourceRadius = d.source.type === 'pod' ? 5 : 7.2;
+      return d.source.y + (dy * sourceRadius) / distance;
+    })
+    .attr('x2', d => {
+      const dx = d.source.x - d.target.x;
+      const dy = d.source.y - d.target.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const targetRadius = d.target.type === 'pod' ? 5 : 7.2;
+      return d.target.x + (dx * targetRadius) / distance;
+    })
+    .attr('y2', d => {
+      const dx = d.source.x - d.target.x;
+      const dy = d.source.y - d.target.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const targetRadius = d.target.type === 'pod' ? 5 : 7.2;
+      return d.target.y + (dy * targetRadius) / distance;
+    });
       
-    // Update the positions of the nodes
     node
       .attr('cx', d => d.x)
       .attr('cy', d => d.y);
 
-    // Update label positions, if applicable
     labels
       .attr('x', d => d.x)
       .attr('y', d => d.y);
@@ -367,8 +364,8 @@
 
     // Create links and nodes inside the containerGroup
     const link = containerGroup.append('g')
-          .attr('stroke', 'black')
-          .attr('stroke-opacity', 0.4)
+          .attr('stroke', 'grey')
+          .attr('stroke-opacity', 1)
           .selectAll('line')
           .data(links)
           .join('line')
@@ -414,10 +411,34 @@
 
           // Update link positions, checking for NaN values
           link
-            .attr('x1', d => isNaN(d.source.x) ? 0 : d.source.x)
-            .attr('y1', d => isNaN(d.source.y) ? 0 : d.source.y)
-            .attr('x2', d => isNaN(d.target.x) ? 0 : d.target.x)
-            .attr('y2', d => isNaN(d.target.y) ? 0 : d.target.y);
+            .attr('x1', d => {
+              const dx = d.target.x - d.source.x;
+              const dy = d.target.y - d.source.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              const sourceRadius = d.source.type === 'pod' ? 5 : 7.2;
+              return distance ? d.source.x + (dx * sourceRadius) / distance : d.source.x;
+            })
+            .attr('y1', d => {
+              const dx = d.target.x - d.source.x;
+              const dy = d.target.y - d.source.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              const sourceRadius = d.source.type === 'pod' ? 5 : 7.2;
+              return distance ? d.source.y + (dy * sourceRadius) / distance : d.source.y;
+            })
+            .attr('x2', d => {
+              const dx = d.source.x - d.target.x;
+              const dy = d.source.y - d.target.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              const targetRadius = d.target.type === 'pod' ? 5 : 7.2;
+              return distance ? d.target.x + (dx * targetRadius) / distance : d.target.x;
+            })
+            .attr('y2', d => {
+              const dx = d.source.x - d.target.x;
+              const dy = d.source.y - d.target.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              const targetRadius = d.target.type === 'pod' ? 5 : 7.2;
+              return distance ? d.target.y + (dy * targetRadius) / distance : d.target.y;
+            });
 
           // Update node positions, checking for NaN values
           node
