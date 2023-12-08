@@ -69,7 +69,7 @@ func isNetworkError(err error) bool {
 }
 
 // ScanNetworkPolicies scans namespaces for network policies
-func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool) (*ScanResult, error) {
+func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool, printScore bool, printMessages bool) (*ScanResult, error) {
 	var output bytes.Buffer
 	var namespacesToScan []string
 	var kubeconfig string
@@ -247,27 +247,30 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 	// Update the score in scanResult
 	scanResult.Score = score
 
-	// Print the final score and other relevant messages only once, here at the end
-	if policyChangesMade {
-		fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
-	}
-
-	if missingPoliciesOrUncoveredPods {
-		if userDeniedPolicyApplication {
-			printToBoth(writer, "\nFor the following namespaces, you should assess the need of implementing network policies:\n")
-			for _, ns := range deniedNamespaces {
-				fmt.Println(" -", ns)
-			}
-			printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a network policy. Check the Kubernetes documentation for more information on network policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/\n")
-		} else {
-			printToBoth(writer, "\nNetfetch scan completed!\n")
+	if printMessages {
+		if policyChangesMade {
+			fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
 		}
-	} else {
-		printToBoth(writer, "\nNo network policies missing. You are good to go!\n")
+
+		if missingPoliciesOrUncoveredPods {
+			if userDeniedPolicyApplication {
+				printToBoth(writer, "\nFor the following namespaces, you should assess the need of implementing network policies:\n")
+				for _, ns := range deniedNamespaces {
+					fmt.Println(" -", ns)
+				}
+				printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a network policy. Check the Kubernetes documentation for more information on network policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/\n")
+			} else {
+				printToBoth(writer, "\nNetfetch scan completed!\n")
+			}
+		} else {
+			printToBoth(writer, "\nNo network policies missing. You are good to go!\n")
+		}
 	}
 
-	// Print the final score
-	fmt.Printf("\nYour Netfetch security score is: %d/42\n", score)
+	if printScore {
+		// Print the final score
+		fmt.Printf("\nYour Netfetch security score is: %d/42\n", score)
+	}
 
 	return scanResult, nil
 }
@@ -364,7 +367,7 @@ func HandleScanRequest(w http.ResponseWriter, r *http.Request) {
 	namespace := r.URL.Query().Get("namespace")
 
 	// Perform the scan
-	result, err := ScanNetworkPolicies(namespace, true, false)
+	result, err := ScanNetworkPolicies(namespace, true, false, true, false)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -441,7 +444,7 @@ func HandleAddPolicyRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Implicit default deny all network policy successfully added to namespace " + req.Namespace})
 
-	scanResult, err := ScanNetworkPolicies(req.Namespace, true, false)
+	scanResult, err := ScanNetworkPolicies(req.Namespace, true, false, false, false)
 	if err != nil {
 		http.Error(w, "Error re-scanning after applying policy: "+err.Error(), http.StatusInternalServerError)
 		return
