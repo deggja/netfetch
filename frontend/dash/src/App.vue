@@ -288,26 +288,24 @@ export default {
         const response = await axios.post('http://localhost:8080/add-policy', { namespace });
         if (response.status === 200) {
           this.showSuccessMessage(namespace);
+          // Update the unprotectedPods list by removing the remediated namespace's pods.
           this.unprotectedPods = this.unprotectedPods.filter(pod => pod.namespace !== namespace);
 
-          if (this.lastScanType === 'cluster') {
-            await this.fetchScanResults();
-          } else {
-            await this.fetchScanResultsForNamespace(namespace);
-          }
+          // Fetch the latest scan results to refresh the UI.
+          await this.fetchScanResults();
 
-          // Refresh the network visualization for the current namespace
-          this.fetchVisualizationData(namespace);
+          // Check if there's a need to update visualization.
+          if (this.lastScanType !== 'cluster') {
+            // If it was not a cluster scan, update visualization for the specific namespace.
+            await this.fetchVisualizationData(namespace);
+          } else {
+            // If it was a cluster scan, ensure no visualization data is displayed.
+            this.namespaceVisualizationData = {};
+            this.isShowClusterMap = false;
+          }
         } else {
           this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Status code: ${response.status}` };
         }
-        
-        this.removeVisualizationDataForNamespace(namespace);
-            // Re-fetch visualization data for the remaining namespaces
-            const remainingNamespaces = this.unprotectedPods
-                .filter(pod => pod.namespace !== namespace)
-                .map(pod => pod.namespace);
-            this.fetchVisualizationDataForNamespaces(remainingNamespaces);
       } catch (error) {
         this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Error: ${error.message}` };
         console.error('Error applying policy to', namespace, ':', error);
