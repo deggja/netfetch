@@ -229,7 +229,7 @@
     }
 
     if (this.visualizationType === 'namespace') {
-      const initialTransform = d3.zoomIdentity.translate(width / 8, height / 4).scale(1);
+      const initialTransform = d3.zoomIdentity.translate(width / 8, height / 4).scale(0.6);
       svg.call(zoom.transform, initialTransform);
     }
 
