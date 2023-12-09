@@ -72,27 +72,13 @@ func isNetworkError(err error) bool {
 func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool, printScore bool, printMessages bool) (*ScanResult, error) {
 	var output bytes.Buffer
 	var namespacesToScan []string
-	var kubeconfig string
 
 	unprotectedPodsCount := 0
 	scanResult := new(ScanResult)
 
 	writer := bufio.NewWriter(&output)
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = filepath.Join(home, ".kube", "config")
-	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		if !kubeconfigExists(kubeconfig) {
-			fmt.Println("It appears you are not connected to a Kubernetes cluster. Please check your kubeconfig.")
-			return nil, err
-		}
-		fmt.Printf("Error building kubeconfig: %s\n", err)
-		return nil, err
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := GetClientset()
 	if err != nil {
 		fmt.Printf("Error creating Kubernetes client: %s\n", err)
 		return nil, err
@@ -278,17 +264,9 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 // Function to create the implicit default deny if missing
 func createAndApplyDefaultDenyPolicy(namespace string) error {
 	// Initialize Kubernetes client
-	var kubeconfig string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = filepath.Join(home, ".kube", "config")
-	}
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	clientset, err := GetClientset()
 	if err != nil {
-		return err
-	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to create Kubernetes client: %v", err)
 	}
 
 	// Define the network policy
@@ -299,7 +277,7 @@ func createAndApplyDefaultDenyPolicy(namespace string) error {
 			Namespace: namespace,
 		},
 		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: metav1.LabelSelector{}, // Selects all pods in the namespace
+			PodSelector: metav1.LabelSelector{},
 			PolicyTypes: []networkingv1.PolicyType{
 				networkingv1.PolicyTypeIngress,
 				networkingv1.PolicyTypeEgress,
@@ -410,13 +388,34 @@ func HandleNamespaceListRequest(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string][]string{"namespaces": namespaceList})
 }
 
+var isClientInitialized = false
+
 // getClientset creates a new Kubernetes clientset
 func GetClientset() (*kubernetes.Clientset, error) {
-	kubeconfig := filepath.Join(homedir.HomeDir(), ".kube", "config")
+	var kubeconfig string
+
+	if !isClientInitialized {
+		if kc := os.Getenv("KUBECONFIG"); kc != "" {
+			kubeconfig = kc
+			fmt.Println("Using KUBECONFIG from environment:", kubeconfig)
+		} else {
+			kubeconfig = filepath.Join(homedir.HomeDir(), ".kube", "config")
+			fmt.Println("Using default kubeconfig path:", kubeconfig)
+		}
+		isClientInitialized = true
+	} else {
+		if kc := os.Getenv("KUBECONFIG"); kc != "" {
+			kubeconfig = kc
+		} else {
+			kubeconfig = filepath.Join(homedir.HomeDir(), ".kube", "config")
+		}
+	}
+
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build config from path %s: %v", kubeconfig, err)
 	}
+
 	return kubernetes.NewForConfig(config)
 }
 
