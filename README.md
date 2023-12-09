@@ -1,6 +1,6 @@
 ![image](https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7)
 
-## Table of Contents
+## Contents
 - [What is this project?](#using-netfetch)
   - [Installation via Homebrew for Mac](#installation-via-homebrew-for-mac)
   - [How to use](#usage)
