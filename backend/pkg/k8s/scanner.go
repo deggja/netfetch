@@ -41,15 +41,6 @@ type ScanResult struct {
 	Score              int
 }
 
-// Check if kubeconfig exists and is not empty
-func kubeconfigExists(kubeconfigPath string) bool {
-	info, err := os.Stat(kubeconfigPath)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir() && info.Size() > 0
-}
-
 // Check if error scanning is related to network issues
 func isNetworkError(err error) bool {
 	var urlError *url.Error
@@ -69,7 +60,7 @@ func isNetworkError(err error) bool {
 }
 
 // ScanNetworkPolicies scans namespaces for network policies
-func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool, printScore bool, printMessages bool) (*ScanResult, error) {
+func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult bool, isCLI bool, printScore bool, printMessages bool) (*ScanResult, error) {
 	var output bytes.Buffer
 	var namespacesToScan []string
 
@@ -178,25 +169,27 @@ func ScanNetworkPolicies(specificNamespace string, returnResult bool, isCLI bool
 					}
 				}
 
-				confirm := false
-				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("Do you want to add a default deny all network policy to the namespace %s?", nsName),
-				}
-				survey.AskOne(prompt, &confirm, nil)
-
-				if confirm {
-					err := createAndApplyDefaultDenyPolicy(nsName)
-					if err != nil {
-						errorPolicyMsg := fmt.Sprintf("\nFailed to apply default deny policy in namespace %s: %s\n", nsName, err)
-						printToBoth(writer, errorPolicyMsg)
-					} else {
-						successPolicyMsg := fmt.Sprintf("\nApplied default deny policy in namespace %s\n", nsName)
-						printToBoth(writer, successPolicyMsg)
-						policyChangesMade = true
+				if !dryRun {
+					confirm := false
+					prompt := &survey.Confirm{
+						Message: fmt.Sprintf("Do you want to add a default deny all network policy to the namespace %s?", nsName),
 					}
-				} else {
-					userDeniedPolicyApplication = true
-					deniedNamespaces = append(deniedNamespaces, nsName)
+					survey.AskOne(prompt, &confirm, nil)
+
+					if confirm {
+						err := createAndApplyDefaultDenyPolicy(nsName)
+						if err != nil {
+							errorPolicyMsg := fmt.Sprintf("\nFailed to apply default deny policy in namespace %s: %s\n", nsName, err)
+							printToBoth(writer, errorPolicyMsg)
+						} else {
+							successPolicyMsg := fmt.Sprintf("\nApplied default deny policy in namespace %s\n", nsName)
+							printToBoth(writer, successPolicyMsg)
+							policyChangesMade = true
+						}
+					} else {
+						userDeniedPolicyApplication = true
+						deniedNamespaces = append(deniedNamespaces, nsName)
+					}
 				}
 			} else {
 				scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
@@ -345,7 +338,7 @@ func HandleScanRequest(w http.ResponseWriter, r *http.Request) {
 	namespace := r.URL.Query().Get("namespace")
 
 	// Perform the scan
-	result, err := ScanNetworkPolicies(namespace, true, false, true, false)
+	result, err := ScanNetworkPolicies(namespace, false, true, false, true, false)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -443,7 +436,7 @@ func HandleAddPolicyRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Implicit default deny all network policy successfully added to namespace " + req.Namespace})
 
-	scanResult, err := ScanNetworkPolicies(req.Namespace, true, false, false, false)
+	scanResult, err := ScanNetworkPolicies(req.Namespace, false, true, false, false, false)
 	if err != nil {
 		http.Error(w, "Error re-scanning after applying policy: "+err.Error(), http.StatusInternalServerError)
 		return
