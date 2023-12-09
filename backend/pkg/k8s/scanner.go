@@ -76,6 +76,13 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 	}
 
 	if specificNamespace != "" {
+		_, err := clientset.CoreV1().Namespaces().Get(context.TODO(), specificNamespace, metav1.GetOptions{})
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil, fmt.Errorf("namespace %s does not exist", specificNamespace)
+			}
+			return nil, fmt.Errorf("error checking namespace %s: %s", specificNamespace, err)
+		}
 		namespacesToScan = append(namespacesToScan, specificNamespace)
 	} else {
 		allNamespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
