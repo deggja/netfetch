@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.0.61"
+const version = "0.0.62"
 
 var rootCmd = &cobra.Command{
 	Use:   "netfetch",
