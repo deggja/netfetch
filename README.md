@@ -3,11 +3,11 @@
 ## Table of Contents
 - [What is this project?](#using-netfetch)
   - [Installation via Homebrew for Mac](#installation-via-homebrew-for-mac)
-  - [How to Use](#usage)
+  - [How to use](#usage)
   - [Dashboard](#dashboard)
   - [Score](#netfetch-score)
-  - [Update Netfetch](#update-netfetch)
-  - [Uninstalling Netfetch](#uninstalling-netfetch)
+  - [Updating](#update-netfetch)
+  - [Uninstalling](#uninstalling-netfetch)
 - [Contribute](#contribute)
 
 ## What is this project?
