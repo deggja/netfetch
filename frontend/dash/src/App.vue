@@ -293,17 +293,14 @@ export default {
           // Update the unprotectedPods list by removing the remediated namespace's pods.
           this.unprotectedPods = this.unprotectedPods.filter(pod => pod.namespace !== namespace);
 
-          // Fetch the latest scan results to refresh the UI.
-          await this.fetchScanResults();
-
-          // Check if there's a need to update visualization.
-          if (this.lastScanType !== 'cluster') {
-            // If it was not a cluster scan, update visualization for the specific namespace.
-            await this.fetchVisualizationData(namespace);
-          } else {
-            // If it was a cluster scan, ensure no visualization data is displayed.
-            this.namespaceVisualizationData = {};
+          if (this.lastScanType === 'cluster') {
+            // If the last scan was a cluster-wide scan, fetch cluster-wide scan results.
+            await this.fetchScanResults();
             this.isShowClusterMap = false;
+            this.namespaceVisualizationData = {};
+          } else {
+            // If the last scan was a namespace-specific scan, fetch scan results for that namespace.
+            await this.fetchScanResultsForNamespace();
           }
         } else {
           this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Status code: ${response.status}` };
