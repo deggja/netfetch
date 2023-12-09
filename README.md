@@ -1,6 +1,16 @@
 ![image](https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7)
 
-## Using Netfetch
+## Table of Contents
+- [Netfetch](#using-netfetch)
+  - [Installation via Homebrew for Mac](#installation-via-homebrew-for-mac)
+  - [How to Use](#usage)
+  - [Dashboard](#dashboard)
+  - [Score](#netfetch-score)
+  - [Update Netfetch](#update-netfetch)
+  - [Uninstalling Netfetch](#uninstalling-netfetch)
+- [Contribute](#contribute)
+
+## What is this project?
 
 This project aims to simplify the mapping of network policies in a Kubernetes cluster. It's a work in progress!
 
@@ -19,6 +29,39 @@ brew install netfetch
 
 For specific Linux distros, Windows and other install binaries, check the latest release.
 
+## Update netfetch
+
+If you are running an older version of the application - you can update `netfetch` by running the following commands.
+
+```sh
+brew update
+netfetch version # verify that you are running the latest version
+```
+
+This will fetch the latest updates from the Homebrew tap.
+
+If you are experiencing issues trying to fetch the latest version, you can run the following to commands:
+
+```sh
+brew uninstall netfetch
+brew cleanup -s netfetch
+brew update
+brew install netfetch
+netfetch version # verify that you are running the latest version
+```
+
+This should clean up any traces of the old version, update the Homebrew tap and refresh the binary.
+
+## Uninstalling netfetch
+
+If you want to uninstall the application - you can do so by running the following commands.
+
+```
+brew uninstall netfetch
+brew cleanup -s netfetch
+brew untap deggja/netfetch https://github.com/deggja/netfetch
+```
+
 ### Prerequisites
 
 Before you begin, ensure you have the following:
@@ -33,6 +76,20 @@ The primary command provided by `netfetch` is `scan`. This command scans all non
 
 You can also scan specific namespaces by specifying the name of that namespace.
 
+You may add the --dryrun or -d flag to run a dryrun of the scan. The application will not prompt you about adding network policies, but still give you the output of the scan.
+
+Run `netfetch` in dryrun against a cluster.
+
+```sh
+netfetch scan --dryrun
+```
+
+Run `netfetch` in dryrun against a namespace
+
+```sh
+netfetch scan production --dryrun
+```
+
 Scan entire cluster.
 
 ```sh
@@ -45,11 +102,23 @@ Scan a namespace called production.
 netfetch scan production
 ```
 
+### Dashboard
+
 Launch dashboard.
 
 ```sh
 netfetch dash
 ```
+
+While in the dashboard, you have a couple of options.
+
+You can use the `Scan cluster` button, which is the equivalent to the CLI `netfetch scan` command. This will populate the table view with all pods not targeted by a network policy.
+
+Scanning a specific namespace is done by selecting the namespace of choice from the `Select a namespace` dropdown and using the `Scan namespace` button. This is the equivalent to the CLI `netfetch scan namespace` command. 
+
+This will populate the table view with all pods not targeted by a network policy in that specific namespace. In addition to this, if there are any pods in the cluster already targeted by a network policy - it will create a visualisation of this in a network map rendered using [D3](https://d3-graph-gallery.com/network.html) below the table view.
+
+Lastly, you can click the `Generate Network Map for Cluster` button to do exactly that. This will render a network map with D3, fetching all pods and policies in all the namespaces you have access to in the cluster.
 
 ![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_new_dash.png)
 
@@ -58,7 +127,9 @@ netfetch dash
 
 The `netfetch` tool provides a basic score at the end of each scan. The score ranges from 1 to 42, with 1 being the lowest and 42 being the highest possible score.
 
-This score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
+As of today, your score will decrease if you are missing implicit default deny all network policies in your namespace or cluster. It will also decrease based on the amount of pods not targeted by a network policy.
+
+The score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
 
 ## Contribute
 You are welcome to contribute!
