@@ -55,9 +55,10 @@ func startDashboardServer() {
 	http.HandleFunc("/scan", k8s.HandleScanRequest)
 	http.HandleFunc("/namespaces", k8s.HandleNamespaceListRequest)
 	http.HandleFunc("/add-policy", k8s.HandleAddPolicyRequest)
+	http.HandleFunc("/namespaces-with-policies", handleNamespacesWithPoliciesRequest)
 	http.HandleFunc("/visualization", k8s.HandleVisualizationRequest)
 	http.HandleFunc("/visualization/cluster", handleClusterVisualizationRequest)
-	http.HandleFunc("/namespaces-with-policies", handleNamespacesWithPoliciesRequest)
+	http.HandleFunc("/policy-yaml", k8s.HandlePolicyYAMLRequest)
 
 	// Wrap the default serve mux with the CORS middleware
 	handler := c.Handler(http.DefaultServeMux)
@@ -70,32 +71,32 @@ func startDashboardServer() {
 	}
 }
 
-// func dashboardHandler(w http.ResponseWriter, r *http.Request) {
-// 	// Check if we are in development mode
-// 	isDevelopment := true // You can use an environment variable or a config flag to set this
-// 	if isDevelopment {
-// 		// Redirect to the Vue dev server
-// 		vueDevServer := "http://localhost:8081"
-// 		http.Redirect(w, r, vueDevServer+r.RequestURI, http.StatusTemporaryRedirect)
-// 	} else {
-// 		// Serve the embedded frontend using statik
-// 		statikFS, err := fs.New()
-// 		if err != nil {
-// 			log.Fatal(err)
-// 		}
-// 		http.FileServer(statikFS).ServeHTTP(w, r)
-// 	}
-// }
-
 func dashboardHandler(w http.ResponseWriter, r *http.Request) {
-	statikFS, err := fs.New()
-	if err != nil {
-		log.Fatal(err)
+	// Check if we are in development mode
+	isDevelopment := true // You can use an environment variable or a config flag to set this
+	if isDevelopment {
+		// Redirect to the Vue dev server
+		vueDevServer := "http://localhost:8081"
+		http.Redirect(w, r, vueDevServer+r.RequestURI, http.StatusTemporaryRedirect)
+	} else {
+		// Serve the embedded frontend using statik
+		statikFS, err := fs.New()
+		if err != nil {
+			log.Fatal(err)
+		}
+		http.FileServer(statikFS).ServeHTTP(w, r)
 	}
-
-	// Serve the embedded frontend
-	http.FileServer(statikFS).ServeHTTP(w, r)
 }
+
+// func dashboardHandler(w http.ResponseWriter, r *http.Request) {
+// 	statikFS, err := fs.New()
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+
+// 	// Serve the embedded frontend
+// 	http.FileServer(statikFS).ServeHTTP(w, r)
+// }
 
 // handleNamespacesWithPoliciesRequest handles the HTTP request for serving a list of namespaces with network policies.
 func handleNamespacesWithPoliciesRequest(w http.ResponseWriter, r *http.Request) {

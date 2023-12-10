@@ -4,6 +4,7 @@
   
   <script>
   import * as d3 from 'd3';
+  import axios from 'axios';
 
   // Define the custom cluster force
   function forceCluster(centers, nodeCounts) {
@@ -43,6 +44,11 @@
       type: String,
       default: 'namespace' // Possible values: 'namespace', 'cluster'
     },
+  },
+  data() {
+    return {
+      yamlDisplayGroup: null,
+    }
   },
   mounted() {
     try {
@@ -216,9 +222,10 @@
       .append('svg')
       .attr('width', '100%')
       .attr('height', '100%')
-      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('viewBox', `0 0 ${width} ${height}`) 
+      .call(zoom);
 
-    svg.call(zoom);
+    svg.on('dblclick.zoom', null);
 
     const containerGroup = svg.append('g');
     const sizeFactor = 3;
@@ -232,6 +239,10 @@
       const initialTransform = d3.zoomIdentity.translate(width / 8, height / 4).scale(0.6);
       svg.call(zoom.transform, initialTransform);
     }
+
+    this.yamlDisplayGroup = containerGroup.append('g')
+    .attr('class', 'yaml-display')
+    .style('visibility', 'hidden');
 
     const adjustedClusterCenters = {};
     Object.keys(clusterCenters).forEach((cluster) => {
@@ -333,7 +344,12 @@
         })
         .attr('stroke', 'grey')
         .attr('stroke-width', 1.5)
-        .call(drag(simulation));
+        .call(drag(simulation))
+        .on('dblclick', (event, d) => {
+          if (d.type === 'policy') {
+            this.fetchPolicyYAML(d.id, d.cluster); // Fetch YAML and display
+          }
+        });
 
     // Legends
     const legendGroup = svg.append('g')
@@ -457,7 +473,7 @@
           .text('Drag to move, scroll to zoom.')
           .style('font-size', '18px')
           .style('fill', 'black');
-    
+
     // Drag functionality
     function drag(simulation) {
       function dragstarted(event) {
@@ -482,7 +498,101 @@
           .on('drag', dragged)
           .on('end', dragended);
           }
+
+          // Add drag behaviour to yaml preview
+        this.yamlDisplayGroup.call(drag(simulation));
       },
+      fetchPolicyYAML(policyName, namespace) {
+        // Construct the URL with query parameters
+        const baseURL = 'http://localhost:8080';
+        const url = new URL('/policy-yaml', baseURL);
+        url.searchParams.append('name', policyName);
+        url.searchParams.append('namespace', namespace);
+
+        // Make the GET request
+        axios.get(url.toString())
+          .then(response => {
+            // Handle the response containing the YAML data
+            const yamlData = response.data;
+            this.displayYAML(yamlData); // Your method to handle the display of the YAML data
+          })
+          .catch(error => {
+            // Handle any errors
+            console.error("Failed to fetch policy YAML:", error);
+          });
+      },
+      displayYAML(yamlContent) {
+        // Clear previous content
+        this.yamlDisplayGroup.selectAll('*').remove();
+
+        // Define drag behavior for the group
+        const drag = d3.drag()
+          .on('drag', function(event, d) {
+            d.x += event.dx;
+            d.y += event.dy;
+            d3.select(this).attr('transform', `translate(${d.x},${d.y})`);
+          });
+
+        // Create the group that will be draggable
+        const yamlGroup = this.yamlDisplayGroup.append('g')
+          .datum({ x: 0, y: 0 }) // Initialize with default position
+          .attr('class', 'yaml-display') // Add class for styling
+          .attr('cursor', 'move') // Change cursor on hover
+          .call(drag); // Apply the drag behavior
+
+        // Add the rectangle for the YAML content
+        yamlGroup.append('rect')
+          .attr('width', 300)
+          .attr('height', 200) // Adjust as needed
+          .attr('rx', 10) // Rounded corners
+          .attr('ry', 10)
+          .attr('fill', '#ffffff')
+          .attr('stroke', '#87CEEB')
+          .attr('stroke-width', '1px');
+
+        // Add a close button (rect and text grouped together)
+        const closeButtonGroup = yamlGroup.append('g')
+          .attr('class', 'close-button')
+          .attr('transform', `translate(${285}, 5)`) // Adjust as necessary
+          .on('click', () => {
+            this.yamlDisplayGroup.style('visibility', 'hidden');
+          });
+
+        // Rect for the close button background
+        closeButtonGroup.append('rect')
+          .attr('width', 16)
+          .attr('height', 16)
+          .attr('rx', 8) // Circle if rx and ry are half of width and height
+          .attr('ry', 8)
+          .attr('fill', '#ff6b6b');
+
+        // 'X' text for the close button
+        closeButtonGroup.append('text')
+          .attr('x', 4)
+          .attr('y', 12)
+          .text('×') // Unicode for the close symbol
+          .attr('fill', '#fff')
+          .style('font-weight', 'bold')
+          .style('pointer-events', 'none'); // Prevent event interference
+
+        // Add the text element for the YAML content
+        const textElement = yamlGroup.append('text')
+          .attr('x', 10) // Padding inside the box
+          .attr('y', 25) // Start text a bit lower
+          .attr('fill', '#333');
+
+        // Add each line as a tspan to the text element
+        const lines = yamlContent.split('\n');
+        lines.forEach((line, index) => {
+          textElement.append('tspan')
+            .attr('x', 10) // Maintain padding for each line
+            .attr('dy', index === 0 ? '0' : '1.2em') // Add line height
+            .text(line);
+        });
+
+        // Make the group visible
+        this.yamlDisplayGroup.style('visibility', 'visible');
+      }
     },
     watch: {
         policies(newVal) {
@@ -524,6 +634,39 @@
   padding: 5px;
   pointer-events: none;
   z-index: 10;
+}
+
+/* YAML preview */
+.yaml-display {
+  font-family: 'Helvetica', sans-serif;
+  font-size: 12px;
+  user-select: none;
+}
+
+.yaml-display rect {
+  fill: #ffffff;
+  stroke: #87CEEB;
+  stroke-width: 1px;
+  rx: 10px;
+
+}
+
+.yaml-display .close-button {
+  fill: black; /* A red color for the close button to indicate an action like 'close' */
+  cursor: pointer;
+}
+
+.yaml-display .close-icon {
+  fill: #fff; /* White color for the 'X' icon */
+  cursor: pointer;
+}
+
+.yaml-display text {
+  fill: black;
+}
+
+svg text {
+  font-size: 12px;
 }
 
 </style>
