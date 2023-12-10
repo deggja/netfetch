@@ -473,6 +473,13 @@
           .text('Drag to move, scroll to zoom.')
           .style('font-size', '18px')
           .style('fill', 'black');
+        
+        svg.append('text')
+          .attr('x', -30)
+          .attr('y', height - 10)
+          .text('Double click to preview policy')
+          .style('font-size', '18px')
+          .style('fill', 'black');
 
     // Drag functionality
     function drag(simulation) {
