@@ -148,8 +148,12 @@ func getNextAvailablePort(startPort string) string {
         if err != nil {
             return port
         } else {
-            int, _ := strconv.Atoi(port)
-            port = strconv.Itoa(int + 1)
+            int, err := strconv.Atoi(port)
+            if err != nil {
+                log.Fatalf("Failed to convert port to string: %v\n", err)
+            } else {
+                port = strconv.Itoa(int + 1)
+            }
         }
     }
 }
