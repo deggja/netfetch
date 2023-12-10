@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+    "net"
+    "strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -63,7 +65,7 @@ func startDashboardServer() {
 	handler := c.Handler(http.DefaultServeMux)
 
 	// Start the server
-	port := "8080"
+	port := getNextAvailablePort("8080")
 	fmt.Printf("Starting dashboard server on http://localhost:%s\n", port)
 	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatalf("Failed to start server: %v\n", err)
@@ -136,4 +138,18 @@ func handleClusterVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(clusterVizData); err != nil {
 		http.Error(w, "Failed to encode cluster visualization data", http.StatusInternalServerError)
 	}
+}
+
+func getNextAvailablePort(startPort string) string {
+    port := startPort
+    for {
+        socket := net.JoinHostPort("localhost", port)
+        _, err := net.Dial("tcp", socket)
+        if err != nil {
+            return port
+        } else {
+            int, _ := strconv.Atoi(port)
+            port = strconv.Itoa(int + 1)
+        }
+    }
 }
