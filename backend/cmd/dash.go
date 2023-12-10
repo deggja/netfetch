@@ -142,7 +142,7 @@ func handleClusterVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 
 func getNextAvailablePort(startPort string) string {
     port := startPort
-    for {
+    for i:=0; i<10; i++ {
         socket := net.JoinHostPort("localhost", port)
         _, err := net.Dial("tcp", socket)
         if err != nil {
@@ -156,4 +156,6 @@ func getNextAvailablePort(startPort string) string {
             }
         }
     }
+    log.Fatalf("Unable to find an available port between %v and %v", startPort, port)
+    return ""
 }
