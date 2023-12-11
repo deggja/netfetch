@@ -17,16 +17,33 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      
+      # Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '21.x'
+
+      # Install dependencies and build frontend
+      - name: Install and Build Frontend
+        run: |
+          cd frontend/dash
+          npm install
+          npm run build
 
       - name: Set up Go 1.21
         uses: actions/setup-go@v2
         with:
           go-version: '1.21'  # Make sure this matches the version in your go.mod file
 
-      - name: Run Go Mod Tidy
+      # Bundle frontend and build backend
+      - name: Bundle frontend and build backend
         run: |
+          statik -src=frontend/dash/dist
           cd backend
           go mod tidy
+          go build -o netfetch
+
 
       - name: Bump version and tag
         id: bump_version
