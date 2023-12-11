@@ -426,7 +426,7 @@ export default {
       try {
         const response = await axios.get(`http://localhost:8080/visualization?namespace=${namespace}`);
         if (response.data && Array.isArray(response.data.policies)) {
-          // existing logic
+          // Your existing logic
         } else {
           console.warn('Visualization data for namespace is null or not in expected format:', namespace);
         }
