@@ -94,7 +94,7 @@
         <!-- Message for No Missing Policies -->
         <h2 v-if="scanInitiated && unprotectedPods.length === 0 && !isShowClusterMap" class="no-policies-message">
           All good!
-          No unproteced pods found.
+          No unprotected pods found.
         </h2>
       </div>
 
