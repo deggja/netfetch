@@ -142,4 +142,4 @@ You are welcome to contribute!
 
 ## License
 
-Netfetch is distributed under the MIT License. See the LICENSE file for more information. See the [LICENSE](LICENSE) for more information.
+Netfetch is distributed under the MIT License. See the [LICENSE](LICENSE) for more information.
