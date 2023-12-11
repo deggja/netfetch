@@ -1,5 +1,9 @@
 <template>
-    <div class="network-policy-visualization" ref="vizContainer"></div>
+    <div class="network-policy-visualization" ref="vizContainer">
+      <div ref="overlayDiv" class="yaml-overlay" v-show="isYamlVisible">
+  <!-- This div will become the overlay when yamlVisible is true -->
+      </div>
+    </div>
   </template>  
   
   <script>
@@ -48,6 +52,7 @@
   data() {
     return {
       yamlDisplayGroup: null,
+      isYamlVisible: false
     }
   },
   mounted() {
@@ -506,9 +511,9 @@
           .on('end', dragended);
           }
 
-          // Add drag behaviour to yaml preview
         this.yamlDisplayGroup.call(drag(simulation));
       },
+      // Fetch policy yaml preview for viz
       fetchPolicyYAML(policyName, namespace) {
         // Construct the URL with query parameters
         const baseURL = 'http://localhost:8080';
@@ -519,87 +524,94 @@
         // Make the GET request
         axios.get(url.toString())
           .then(response => {
-            // Handle the response containing the YAML data
             const yamlData = response.data;
-            this.displayYAML(yamlData); // Your method to handle the display of the YAML data
+            this.displayYAML(yamlData);
           })
           .catch(error => {
-            // Handle any errors
             console.error("Failed to fetch policy YAML:", error);
           });
       },
       displayYAML(yamlContent) {
-        // Clear previous content
-        this.yamlDisplayGroup.selectAll('*').remove();
+      this.isYamlVisible = true;
 
-        // Define drag behavior for the group
-        const drag = d3.drag()
-          .on('drag', function(event, d) {
-            d.x += event.dx;
-            d.y += event.dy;
-            d3.select(this).attr('transform', `translate(${d.x},${d.y})`);
+      const overlayDiv = this.$refs.overlayDiv;
+
+      overlayDiv.innerHTML = `<pre>${yamlContent}</pre>`;
+
+      overlayDiv.style.position = 'absolute';
+      overlayDiv.style.left = '50%';
+      overlayDiv.style.top = '50%';
+      overlayDiv.style.transform = 'translate(-50%, -50%)';
+      overlayDiv.style.zIndex = 100;
+      overlayDiv.style.backgroundColor = 'white';
+      overlayDiv.style.border = '1px solid #87CEEB';
+      overlayDiv.style.padding = '10px';
+      overlayDiv.style.boxSizing = 'border-box';
+      overlayDiv.style.pointerEvents = 'all';
+
+      // Draggable functionality
+      let isDragging = false;
+      let startX, startY;
+
+      overlayDiv.onmousedown = (e) => {
+        isDragging = true;
+        startX = e.clientX - overlayDiv.offsetLeft;
+        startY = e.clientY - overlayDiv.offsetTop;
+        e.preventDefault(); // Prevent text selection
+      };
+
+      document.onmousemove = (e) => {
+        if (!isDragging) return;
+        overlayDiv.style.left = `${e.clientX - startX}px`;
+        overlayDiv.style.top = `${e.clientY - startY}px`;
+      };
+
+      document.onmouseup = () => {
+        isDragging = false;
+      };
+
+      // Copy Code button
+      const copyButton = document.createElement('button');
+      copyButton.textContent = 'Copy';
+      copyButton.style.position = 'absolute';
+      copyButton.style.bottom = '10px';
+      copyButton.style.right = '10px';
+      copyButton.style.background = 'white';
+      copyButton.style.color = 'black';
+      copyButton.style.border = '1px solid #87CEEB';
+      copyButton.style.padding = '5px 5px';
+      copyButton.style.cursor = 'pointer';
+      copyButton.style.borderRadius = '5px';
+      copyButton.onclick = () => {
+        // Copy the YAML content to clipboard
+        navigator.clipboard.writeText(yamlContent)
+          .then(() => {
+            alert('Copied YAML');
+          })
+          .catch(err => {
+            console.error('Error in copying text: ', err);
           });
+      };
+      overlayDiv.appendChild(copyButton);
 
-        // Create the group that will be draggable
-        const yamlGroup = this.yamlDisplayGroup.append('g')
-          .datum({ x: 0, y: 0 }) // Initialize with default position
-          .attr('class', 'yaml-display') // Add class for styling
-          .attr('cursor', 'move') // Change cursor on hover
-          .call(drag); // Apply the drag behavior
+      const closeButton = document.createElement('button');
+      closeButton.textContent = '×';
+      closeButton.style.position = 'absolute';
+      closeButton.style.top = '-2px';
+      closeButton.style.right = '3px';
+      closeButton.style.background = 'transparent';
+      closeButton.style.border = 'none';
+      closeButton.style.cursor = 'pointer';
+      closeButton.style.fontSize = '20px';
+      closeButton.style.fontWeight = 'bold';
+      closeButton.onclick = () => {
+        this.isYamlVisible = false;
+      };
+      overlayDiv.appendChild(closeButton);
 
-        // Add the rectangle for the YAML content
-        yamlGroup.append('rect')
-          .attr('width', 300)
-          .attr('height', 200) // Adjust as needed
-          .attr('rx', 10) // Rounded corners
-          .attr('ry', 10)
-          .attr('fill', '#ffffff')
-          .attr('stroke', '#87CEEB')
-          .attr('stroke-width', '1px');
-
-        // Add a close button (rect and text grouped together)
-        const closeButtonGroup = yamlGroup.append('g')
-          .attr('class', 'close-button')
-          .attr('transform', `translate(${285}, 5)`) // Adjust as necessary
-          .on('click', () => {
-            this.yamlDisplayGroup.style('visibility', 'hidden');
-          });
-
-        // Rect for the close button background
-        closeButtonGroup.append('rect')
-          .attr('width', 16)
-          .attr('height', 16)
-          .attr('rx', 8) // Circle if rx and ry are half of width and height
-          .attr('ry', 8)
-          .attr('fill', '#ff6b6b');
-
-        // 'X' text for the close button
-        closeButtonGroup.append('text')
-          .attr('x', 4)
-          .attr('y', 12)
-          .text('×') // Unicode for the close symbol
-          .attr('fill', '#fff')
-          .style('font-weight', 'bold')
-          .style('pointer-events', 'none'); // Prevent event interference
-
-        // Add the text element for the YAML content
-        const textElement = yamlGroup.append('text')
-          .attr('x', 10) // Padding inside the box
-          .attr('y', 25) // Start text a bit lower
-          .attr('fill', '#333');
-
-        // Add each line as a tspan to the text element
-        const lines = yamlContent.split('\n');
-        lines.forEach((line, index) => {
-          textElement.append('tspan')
-            .attr('x', 10) // Maintain padding for each line
-            .attr('dy', index === 0 ? '0' : '1.2em') // Add line height
-            .text(line);
-        });
-
-        // Make the group visible
-        this.yamlDisplayGroup.style('visibility', 'visible');
-      }
+      // Make the overlay draggable using D3 or another method
+      // This part is up to you if you want to implement it
+      },
     },
     watch: {
         policies(newVal) {
@@ -631,6 +643,7 @@
   width: 100%;
   padding: 20px;
   height: 600px;
+  position: relative;
 }
 
 .tooltip {
@@ -645,9 +658,21 @@
 
 /* YAML preview */
 .yaml-display {
-  font-family: 'Helvetica', sans-serif;
-  font-size: 12px;
-  user-select: none;
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  background: white;
+  border: 1px solid #87CEEB;
+  padding: 10px;
+  box-sizing: border-box;
+  pointer-events: all;
+}
+
+.yaml-display[style*="visibility: visible"] {
+  pointer-events: all;
 }
 
 .yaml-display rect {
@@ -659,12 +684,6 @@
 }
 
 .yaml-display .close-button {
-  fill: black; /* A red color for the close button to indicate an action like 'close' */
-  cursor: pointer;
-}
-
-.yaml-display .close-icon {
-  fill: #fff; /* White color for the 'X' icon */
   cursor: pointer;
 }
 
