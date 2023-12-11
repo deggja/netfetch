@@ -323,10 +323,6 @@ func calculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int)
 		score -= 20
 	}
 
-	if !hasDenyAll {
-		score -= 15
-	}
-
 	// Deduct score based on the number of unprotected pods
 	score -= unprotectedPodsCount
 
