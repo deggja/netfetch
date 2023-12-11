@@ -31,6 +31,7 @@ jobs:
           npm install
           npm run build
 
+      # Set up Go environment
       - name: Set up Go 1.21
         uses: actions/setup-go@v2
         with:
@@ -46,6 +47,23 @@ jobs:
         run: |
           cd backend
           statik -src=../frontend/dash/dist
+      
+      # Bump version and tag
+      - name: Bump version and tag
+        run: |
+          chmod +x .github/scripts/bump_version.sh
+          echo "NEW_VERSION=$(.github/scripts/bump_version.sh)" >> $GITHUB_ENV
+        
+      # Check new version tag
+      - name: Print new version
+        run: echo "New version tag is ${{ env.new_tag }}"
+      
+      # Update version in backend
+      - name: Update version in root.go
+        run: |
+          sed -i "s/^const version = \".*\"/const version = \"${{ env.new_tag }}\"/" backend/cmd/root.go
+        env:
+          new_tag: ${{ env.new_tag }}
 
       # Build backend
       - name: Build backend
@@ -58,17 +76,11 @@ jobs:
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "feat: 🏗️ build artifacts"
+          commit_message: "feat: 🏗️ commit build artifacts"
           branch: main
           file_pattern: backend/netfetch backend/statik/statik.go
           commit_user_name: 'deggja'
           commit_user_email: 'danieldagfinrud@gmail.com'
-
-      - name: Bump version and tag
-        id: bump_version
-        run: |
-          chmod +x .github/scripts/bump_version.sh
-          .github/scripts/bump_version.sh
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
