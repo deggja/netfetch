@@ -473,17 +473,17 @@
         });
         
         svg.append('text')
-          .attr('x', width - 200)
-          .attr('y', height - 10)
+          .attr('x', width - 180)
+          .attr('y', height - 3)
           .text('Drag to move, scroll to zoom.')
-          .style('font-size', '18px')
+          .style('font-size', '16px')
           .style('fill', 'black');
         
         svg.append('text')
           .attr('x', -30)
-          .attr('y', height - 10)
+          .attr('y', height - 3)
           .text('Double click to preview policy')
-          .style('font-size', '18px')
+          .style('font-size', '16px')
           .style('fill', 'black');
 
     // Drag functionality
@@ -583,15 +583,19 @@
       copyButton.style.cursor = 'pointer';
       copyButton.style.borderRadius = '5px';
       copyButton.onclick = () => {
-        // Copy the YAML content to clipboard
-        navigator.clipboard.writeText(yamlContent)
-          .then(() => {
-            alert('Copied YAML');
-          })
-          .catch(err => {
-            console.error('Error in copying text: ', err);
-          });
-      };
+      // Copy the YAML content to clipboard
+      navigator.clipboard.writeText(yamlContent)
+        .then(() => {
+          const originalText = copyButton.textContent;
+          copyButton.textContent = 'Copied!';
+          setTimeout(() => {
+            copyButton.textContent = originalText;
+          }, 2000); // Change back after 2 seconds
+        })
+        .catch(err => {
+          console.error('Error in copying text: ', err);
+        });
+    };
       overlayDiv.appendChild(copyButton);
 
       const closeButton = document.createElement('button');
