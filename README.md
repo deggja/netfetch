@@ -118,11 +118,13 @@ Scanning a specific namespace is done by selecting the namespace of choice from 
 
 This will populate the table view with all pods not targeted by a network policy in that specific namespace. In addition to this, if there are any pods in the cluster already targeted by a network policy - it will create a visualisation of this in a network map rendered using [D3](https://d3-graph-gallery.com/network.html) below the table view.
 
+![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_new_dash.png)
+
 You can click the `Create cluster map` button to do exactly that. This will render a network map with D3, fetching all pods and policies in all the namespaces you have access to in the cluster.
 
 Inside the network map visualisations, you can double click the network policy nodes to preview the YAML of that policy.
 
-![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_new_dash.png)
+![Network map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_network_map.png)
 
 
 ## Netfetch score
