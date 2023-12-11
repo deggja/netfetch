@@ -40,6 +40,7 @@
       </div>
 
       <div class="buttons">
+        <div class="left-buttons">
         <button @click="fetchScanResults" class="scan-btn">Scan cluster</button>
         <button @click="fetchScanResultsForNamespace" class="scan-btn">Scan namespace</button>
         <select v-model="selectedNamespace" class="namespace-select">
@@ -48,7 +49,8 @@
             {{ namespace }}
           </option>
         </select>
-        <button @click="generateClusterNetworkMap" class="scan-btn">Generate Network Map for Cluster</button>
+        </div>
+        <button @click="generateClusterNetworkMap" class="scan-btn create-cluster-map-btn">Create cluster map</button>
       </div>
 
       <div class="message-container">
@@ -57,7 +59,6 @@
           {{ message.text }}
         </div>
       </div>
-
       <div class="table-container">
         <!-- Unprotected Pods Table -->
         <section v-if="unprotectedPods.length > 0 && scanInitiated">
@@ -93,8 +94,7 @@
 
         <!-- Message for No Missing Policies -->
         <h2 v-if="scanInitiated && unprotectedPods.length === 0 && !isShowClusterMap" class="no-policies-message">
-          All good!
-          No unproteced pods found.
+          Scan completed
         </h2>
       </div>
 
@@ -411,7 +411,7 @@ export default {
         this.clusterVisualizationData = response.data;
       } else {
         console.error('Received data is not an array:', response.data);
-        this.clusterVisualizationData = []; // Set to an empty array if data is not correct
+        this.clusterVisualizationData = [];
       }
     } catch (error) {
       console.error('Error fetching cluster visualization data:', error);
@@ -482,7 +482,7 @@ body, html {
 .menu-item a {
   display: block;
   padding: 10px;
-  color: #333;
+  color: black;
   text-decoration: none;
   border-left: 5px solid transparent;
 }
@@ -493,7 +493,7 @@ body, html {
 }
 
 .menu-item a:hover {
-  background-color: #ddd;
+  background-color: #87CEEB;
 }
 
 .content {
@@ -503,13 +503,13 @@ body, html {
 
 .header {
   display: flex;
+  min-height: 100px;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
 .dashboard-title {
-  color: #333;
+  color: black;
   font-size: 24px;
 }
 
@@ -523,6 +523,8 @@ body, html {
   justify-content: center;
   position: relative;
   flex-direction: column;
+  margin-left: auto;
+  margin-right: 30px;
 }
 
 .score {
@@ -541,8 +543,16 @@ text-align: center;
 
 .buttons {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
   margin-bottom: 20px;
+  margin-top: 10px;
+}
+
+.left-buttons {
+  display: flex;
+  gap: 10px;
 }
 
 .scan-btn {
@@ -555,12 +565,29 @@ text-align: center;
 }
 
 .namespace-select {
-  padding: 10px;
+  padding: 10px 15px;
   border-radius: 5px;
-  border: 2px solid #87CEEB;
-  text-align: center;
+  border: 1px solid #87CEEB;
+  background-color: white;
+  font-size: 14px;
+  color: #333;
+  -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg fill="%2387CEEB" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.namespace-select:hover {
+  border-color: #5cb7db;
+}
+
+.namespace-select:focus {
+  outline: none;
+  border-color: #5cb7db;
 }
 
 .scan-btn:hover {
@@ -744,86 +771,84 @@ color: black;
   fill: #555;
 }
 
-/* Dark Mode Specific Styles */
 .app-container.dark-mode {
-  background-color: #000; /* Black background for the entire app */
-  color: #fff; /* White text color for the entire app */
+  background-color: #000;
+  color: #fff;
 }
 
 .app-container.dark-mode .sidebar {
-  background-color: #1a1a1a; /* Slightly lighter black for sidebar */
-  color: #fff; /* White text for sidebar */
+  background-color: #1a1a1a;
+  color: #fff;
 }
 
 .app-container.dark-mode .menu-item a {
-  color: #fff; /* White text for menu items */
+  color: #fff;
 }
 
 .app-container.dark-mode .menu-item a.active {
-  background-color: #333; /* Darker background for active menu item */
+  background-color: #333;
 }
 
 .app-container.dark-mode .content {
-  color: #fff; /* White text for main content */
+  color: #fff;
 }
 
 .app-container.dark-mode .header {
-  color: #fff; /* White text for header */
+  color: #fff;
 }
 
 .app-container.dark-mode .score-container {
-  border: 5px solid #444; /* Dark border for score container */
+  border: 5px solid #444;
 }
 
 .app-container.dark-mode .buttons .scan-btn {
-  border: 2px solid #444; /* Dark border for buttons */
-  color: #fff; /* White text for buttons */
+  border: 2px solid #444;
+  color: #fff;
 }
 
 .app-container.dark-mode .buttons .scan-btn:hover {
-  background-color: #333; /* Darker background on hover for buttons */
+  background-color: #333;
 }
 
 .app-container.dark-mode .message-container .success-message,
 .app-container.dark-mode .message-container .error-message {
-  color: #fff; /* White text for messages */
+  color: #fff;
 }
 
 .app-container.dark-mode .table-container {
-  background-color: #1a1a1a; /* Slightly lighter black for table container */
-  color: #fff; /* White text for table */
+  background-color: #1a1a1a;
+  color: #fff;
 }
 
 .app-container.dark-mode .pods-table th,
 .app-container.dark-mode .pods-table td {
-  border: 1px solid #444; /* Dark border for table cells */
+  border: 1px solid #444;
 }
 
 .app-container.dark-mode .pods-table th {
-  background-color: #333; /* Dark background for table header */
+  background-color: #333;
 }
 
 .app-container.dark-mode .remediate-btn {
-  background-color: #333; /* Dark background for remediate button */
+  background-color: #333;
 }
 
 .app-container.dark-mode .pagination-controls .pagination-btn {
-  border: 1px solid #444; /* Dark border for pagination buttons */
+  border: 1px solid #444;
 }
 
 .app-container.dark-mode .network-policy-visualization {
-  border: 2px solid #444; /* Dark border for visualization */
-  background-color: #1a1a1a; /* Slightly lighter black for visualization */
+  border: 2px solid #444;
+  background-color: #1a1a1a;
 }
 
-/* Adjust toggle button appearance in dark mode */
 .app-container.dark-mode .dark-mode-toggle {
-  background-color: #333; /* Dark background for toggle button */
-  color: #fff; /* White icon color */
+  background-color: #333;
+  color: #fff;
 }
 
 .app-container.dark-mode .dark-mode-toggle:hover {
-  background-color: #444; /* Slightly lighter black on hover for toggle button */
+  background-color: #444;
 }
 
 </style>
