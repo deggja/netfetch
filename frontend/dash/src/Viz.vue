@@ -1,9 +1,14 @@
 <template>
-    <div class="network-policy-visualization" ref="vizContainer"></div>
+    <div class="network-policy-visualization" ref="vizContainer">
+      <div ref="overlayDiv" class="yaml-overlay" v-show="isYamlVisible">
+  <!-- This div will become the overlay when yamlVisible is true -->
+      </div>
+    </div>
   </template>  
   
   <script>
   import * as d3 from 'd3';
+  import axios from 'axios';
 
   // Define the custom cluster force
   function forceCluster(centers, nodeCounts) {
@@ -43,6 +48,12 @@
       type: String,
       default: 'namespace' // Possible values: 'namespace', 'cluster'
     },
+  },
+  data() {
+    return {
+      yamlDisplayGroup: null,
+      isYamlVisible: false
+    }
   },
   mounted() {
     try {
@@ -216,9 +227,10 @@
       .append('svg')
       .attr('width', '100%')
       .attr('height', '100%')
-      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('viewBox', `0 0 ${width} ${height}`) 
+      .call(zoom);
 
-    svg.call(zoom);
+    svg.on('dblclick.zoom', null);
 
     const containerGroup = svg.append('g');
     const sizeFactor = 3;
@@ -232,6 +244,10 @@
       const initialTransform = d3.zoomIdentity.translate(width / 8, height / 4).scale(0.6);
       svg.call(zoom.transform, initialTransform);
     }
+
+    this.yamlDisplayGroup = containerGroup.append('g')
+    .attr('class', 'yaml-display')
+    .style('visibility', 'hidden');
 
     const adjustedClusterCenters = {};
     Object.keys(clusterCenters).forEach((cluster) => {
@@ -333,7 +349,12 @@
         })
         .attr('stroke', 'grey')
         .attr('stroke-width', 1.5)
-        .call(drag(simulation));
+        .call(drag(simulation))
+        .on('dblclick', (event, d) => {
+          if (d.type === 'policy') {
+            this.fetchPolicyYAML(d.id, d.cluster); // Fetch YAML and display
+          }
+        });
 
     // Legends
     const legendGroup = svg.append('g')
@@ -452,12 +473,19 @@
         });
         
         svg.append('text')
-          .attr('x', width - 200)
-          .attr('y', height - 10)
+          .attr('x', width - 180)
+          .attr('y', height - 3)
           .text('Drag to move, scroll to zoom.')
-          .style('font-size', '18px')
+          .style('font-size', '16px')
           .style('fill', 'black');
-    
+        
+        svg.append('text')
+          .attr('x', -30)
+          .attr('y', height - 3)
+          .text('Double click to preview policy')
+          .style('font-size', '16px')
+          .style('fill', 'black');
+
     // Drag functionality
     function drag(simulation) {
       function dragstarted(event) {
@@ -482,6 +510,111 @@
           .on('drag', dragged)
           .on('end', dragended);
           }
+
+        this.yamlDisplayGroup.call(drag(simulation));
+      },
+      // Fetch policy yaml preview for viz
+      fetchPolicyYAML(policyName, namespace) {
+        // Construct the URL with query parameters
+        const baseURL = 'http://localhost:8080';
+        const url = new URL('/policy-yaml', baseURL);
+        url.searchParams.append('name', policyName);
+        url.searchParams.append('namespace', namespace);
+
+        // Make the GET request
+        axios.get(url.toString())
+          .then(response => {
+            const yamlData = response.data;
+            this.displayYAML(yamlData);
+          })
+          .catch(error => {
+            console.error("Failed to fetch policy YAML:", error);
+          });
+      },
+      displayYAML(yamlContent) {
+      this.isYamlVisible = true;
+
+      const overlayDiv = this.$refs.overlayDiv;
+
+      overlayDiv.innerHTML = `<pre>${yamlContent}</pre>`;
+
+      overlayDiv.style.position = 'absolute';
+      overlayDiv.style.left = '50%';
+      overlayDiv.style.top = '50%';
+      overlayDiv.style.transform = 'translate(-50%, -50%)';
+      overlayDiv.style.zIndex = 100;
+      overlayDiv.style.backgroundColor = 'white';
+      overlayDiv.style.border = '1px solid #87CEEB';
+      overlayDiv.style.padding = '10px';
+      overlayDiv.style.boxSizing = 'border-box';
+      overlayDiv.style.pointerEvents = 'all';
+
+      // Draggable functionality
+      let isDragging = false;
+      let startX, startY;
+
+      overlayDiv.onmousedown = (e) => {
+        isDragging = true;
+        startX = e.clientX - overlayDiv.offsetLeft;
+        startY = e.clientY - overlayDiv.offsetTop;
+        e.preventDefault(); // Prevent text selection
+      };
+
+      document.onmousemove = (e) => {
+        if (!isDragging) return;
+        overlayDiv.style.left = `${e.clientX - startX}px`;
+        overlayDiv.style.top = `${e.clientY - startY}px`;
+      };
+
+      document.onmouseup = () => {
+        isDragging = false;
+      };
+
+      // Copy Code button
+      const copyButton = document.createElement('button');
+      copyButton.textContent = 'Copy';
+      copyButton.style.position = 'absolute';
+      copyButton.style.bottom = '10px';
+      copyButton.style.right = '10px';
+      copyButton.style.background = 'white';
+      copyButton.style.color = 'black';
+      copyButton.style.border = '1px solid #87CEEB';
+      copyButton.style.padding = '5px 5px';
+      copyButton.style.cursor = 'pointer';
+      copyButton.style.borderRadius = '5px';
+      copyButton.onclick = () => {
+      // Copy the YAML content to clipboard
+      navigator.clipboard.writeText(yamlContent)
+        .then(() => {
+          const originalText = copyButton.textContent;
+          copyButton.textContent = 'Copied!';
+          setTimeout(() => {
+            copyButton.textContent = originalText;
+          }, 2000); // Change back after 2 seconds
+        })
+        .catch(err => {
+          console.error('Error in copying text: ', err);
+        });
+    };
+      overlayDiv.appendChild(copyButton);
+
+      const closeButton = document.createElement('button');
+      closeButton.textContent = '×';
+      closeButton.style.position = 'absolute';
+      closeButton.style.top = '-2px';
+      closeButton.style.right = '3px';
+      closeButton.style.background = 'transparent';
+      closeButton.style.border = 'none';
+      closeButton.style.cursor = 'pointer';
+      closeButton.style.fontSize = '20px';
+      closeButton.style.fontWeight = 'bold';
+      closeButton.onclick = () => {
+        this.isYamlVisible = false;
+      };
+      overlayDiv.appendChild(closeButton);
+
+      // Make the overlay draggable using D3 or another method
+      // This part is up to you if you want to implement it
       },
     },
     watch: {
@@ -514,6 +647,7 @@
   width: 100%;
   padding: 20px;
   height: 600px;
+  position: relative;
 }
 
 .tooltip {
@@ -524,6 +658,45 @@
   padding: 5px;
   pointer-events: none;
   z-index: 10;
+}
+
+/* YAML preview */
+.yaml-display {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  background: white;
+  border: 1px solid #87CEEB;
+  padding: 10px;
+  box-sizing: border-box;
+  pointer-events: all;
+}
+
+.yaml-display[style*="visibility: visible"] {
+  pointer-events: all;
+}
+
+.yaml-display rect {
+  fill: #ffffff;
+  stroke: #87CEEB;
+  stroke-width: 1px;
+  rx: 10px;
+
+}
+
+.yaml-display .close-button {
+  cursor: pointer;
+}
+
+.yaml-display text {
+  fill: black;
+}
+
+svg text {
+  font-size: 12px;
 }
 
 </style>

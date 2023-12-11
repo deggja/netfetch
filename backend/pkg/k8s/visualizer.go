@@ -6,7 +6,10 @@ import (
 	"log"
 	"net/http"
 
+	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // VisualizationData represents the structure of network policy and pod data for visualization.
@@ -142,4 +145,71 @@ func GatherClusterVisualizationData() ([]VisualizationData, error) {
 	}
 
 	return clusterVizData, nil
+}
+
+// HandlePolicyYAMLRequest handles the HTTP request for serving the YAML of a network policy.
+func HandlePolicyYAMLRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract the policy name and namespace from query parameters
+	policyName := r.URL.Query().Get("name")
+	namespace := r.URL.Query().Get("namespace")
+	if policyName == "" || namespace == "" {
+		http.Error(w, "Policy name or namespace not provided", http.StatusBadRequest)
+		return
+	}
+
+	// Retrieve the network policy YAML
+	yaml, err := getNetworkPolicyYAML(namespace, policyName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-yaml")
+	w.Write([]byte(yaml))
+}
+
+// getNetworkPolicyYAML retrieves the YAML representation of a network policy, excluding annotations.
+func getNetworkPolicyYAML(namespace, policyName string) (string, error) {
+	clientset, err := GetClientset()
+	if err != nil {
+		return "", err
+	}
+
+	// Get the specified network policy
+	networkPolicy, err := clientset.NetworkingV1().NetworkPolicies(namespace).Get(context.TODO(), policyName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	// Convert the network policy to a map[string]interface{} for manipulation
+	networkPolicyMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(networkPolicy)
+	if err != nil {
+		return "", err
+	}
+
+	// Remove the fields that are not needed
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "annotations")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "generateName")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "selfLink")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "uid")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "resourceVersion")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "generation")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "creationTimestamp")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "deletionTimestamp")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "deletionGracePeriodSeconds")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "ownerReferences")
+	unstructured.RemoveNestedField(networkPolicyMap, "metadata", "managedFields")
+
+	// Convert the cleaned map back to YAML
+	yamlBytes, err := yaml.Marshal(networkPolicyMap)
+	if err != nil {
+		return "", err
+	}
+
+	return string(yamlBytes), nil
 }
