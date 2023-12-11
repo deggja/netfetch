@@ -4,21 +4,34 @@
 git fetch --tags
 latest_tag=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null)
 
-if [ -z "$latest_tag" ]; then
-  new_tag="0.0.1"
-else
-  # Increment the version
-  major=$(echo $latest_tag | cut -d. -f1)
-  minor=$(echo $latest_tag | cut -d. -f2)
-  patch=$(echo $latest_tag | cut -d. -f3)
-  if [ $patch -lt 99 ]; then
-    let patch+=1
-  else
-    let minor+=1
-    patch=0
-  fi
-  new_tag="${major}.${minor}.${patch}"
+# Initialize variables
+major=0
+minor=0
+patch=0
+
+if [ ! -z "$latest_tag" ]; then
+  # Parse the current version
+  IFS='.' read -r major minor patch <<< "${latest_tag}"
 fi
+
+# Analyze commit messages since the last tag for versioning
+for commit in $(git rev-list $latest_tag..HEAD); do
+    message=$(git log --format=%B -n 1 $commit)
+    
+    if [[ $message == *"#major"* ]]; then
+      let major+=1
+      minor=0
+      patch=0
+      break
+    elif [[ $message == *"#minor"* ]]; then
+      let minor+=1
+      patch=0
+    elif [[ $message == *"#patch"* ]]; then
+      let patch+=1
+    fi
+done
+
+new_tag="${major}.${minor}.${patch}"
 
 # Set output for the next steps using environment file
 echo "new_tag=$new_tag" >> $GITHUB_ENV
