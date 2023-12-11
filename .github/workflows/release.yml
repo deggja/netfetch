@@ -58,7 +58,7 @@ jobs:
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "Build artifacts"
+          commit_message: "feat: 🏗️ build artifacts"
           branch: main
           file_pattern: backend/netfetch backend/statik/statik.go
           commit_user_name: 'deggja'
