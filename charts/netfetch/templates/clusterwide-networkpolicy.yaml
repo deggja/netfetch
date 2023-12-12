@@ -1,0 +1,19 @@
+# templates/clusterwide-networkpolicy.yaml
+{{- if and .Values.rbac.create .Values.rbac.clusterWideAccess }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "netfetch.fullname" . }}-clusterwide-netpol
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "netfetch.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {} # Allow all ingress traffic
+  egress:
+    - {} # Allow all egress traffic
+{{- end }}
