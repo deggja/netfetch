@@ -29,6 +29,18 @@ brew install netfetch
 
 For specific Linux distros, Windows and other install binaries, check the latest release.
 
+## Installation via Helm
+
+You can deploy `netfetch` in your Kubernetes clusters using Helm.^
+
+```sh
+helm repo add deggja https://deggja.github.io/
+
+helm repo update
+
+helm install netfetch deggja/netfetch --namespace netfetch
+```
+
 ## Update netfetch
 
 If you are running an older version of the application - you can update `netfetch` by running the following commands.
