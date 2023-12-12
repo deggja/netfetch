@@ -43,7 +43,7 @@ jobs:
           go install github.com/rakyll/statik@latest
 
       # Bundle app
-      - name: Bundle frontend and build backend
+      - name: Bundle frontend with backend
         run: |
           cd backend
           statik -src=../frontend/dash/dist
@@ -52,11 +52,13 @@ jobs:
       - name: Bump version and tag
         run: |
           chmod +x .github/scripts/bump_version.sh
-          echo "NEW_VERSION=$(.github/scripts/bump_version.sh)" >> $GITHUB_ENV
+          .github/scripts/bump_version.sh
         
       # Check new version tag
       - name: Print new version
         run: echo "New version tag is ${{ env.new_tag }}"
+        env:
+          new_tag: ${{ env.new_tag }}
       
       # Update version in backend
       - name: Update version in root.go
@@ -82,6 +84,7 @@ jobs:
           commit_user_name: 'deggja'
           commit_user_email: 'danieldagfinrud@gmail.com'
 
+      # Run GoReleaser
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
@@ -89,3 +92,38 @@ jobs:
           args: release --clean --debug
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Download the released binary
+      - name: Download Released Binary
+        run: |
+          curl -L "https://github.com/deggja/netfetch/releases/download/${{ env.new_tag }}/netfetch_${{ env.new_tag }}_darwin_amd64.tar.gz" -o "netfetch_release.tar.gz"
+        env:
+          new_tag: ${{ env.new_tag }}
+
+      # Calculate checksum of the released binary
+      - name: Calculate SHA256 Checksum of Released Binary
+        run: |
+          sha256sum netfetch_release.tar.gz > netfetch_sha256.txt
+
+      # Update homebrew formulae
+      - name: Update Homebrew Formula
+        run: |
+          SHA256=$(cat netfetch_sha256.txt | awk '{ print $1 }')
+          sed -i "s|url \".*\"|url \"https://github.com/deggja/netfetch/releases/download/${{ env.new_tag }}/netfetch_${{ env.new_tag }}_darwin_amd64.tar.gz\"|" netfetch.rb
+          sed -i "s/sha256 \".*\"/sha256 \"$SHA256\"/" netfetch.rb
+        env:
+          new_tag: ${{ env.new_tag }}
+      
+      # Commit and push final changes
+      - name: Commit and Push Homebrew Formula Update
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "feat: update brew for version ${{ env.new_tag }}"
+          file_pattern: netfetch.rb
+          branch: main
+          commit_user_name: 'deggja'
+          commit_user_email: 'danieldagfinrud@gmail.com'
+        env:
+          new_tag: ${{ env.new_tag }}
+
+          
