@@ -17,74 +17,23 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      
-      # Set up Node.js environment
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '21.x'
 
-      # Install dependencies and build frontend
-      - name: Install and Build Frontend
-        run: |
-          cd frontend/dash
-          npm install
-          npm run build
-
-      # Set up Go environment
       - name: Set up Go 1.21
         uses: actions/setup-go@v2
         with:
           go-version: '1.21'  # Make sure this matches the version in your go.mod file
 
-      # Install statik for bundling frontend assets
-      - name: Install statik
-        run: |
-          go install github.com/rakyll/statik@latest
-
-      # Bundle app
-      - name: Bundle frontend with backend
-        run: |
-          cd backend
-          statik -src=../frontend/dash/dist
-      
-      # Bump version and tag
-      - name: Bump version and tag
-        run: |
-          chmod +x .github/scripts/bump_version.sh
-          .github/scripts/bump_version.sh
-        
-      # Check new version tag
-      - name: Print new version
-        run: echo "New version tag is ${{ env.new_tag }}"
-        env:
-          new_tag: ${{ env.new_tag }}
-      
-      # Update version in backend
-      - name: Update version in root.go
-        run: |
-          sed -i "s/^const version = \".*\"/const version = \"${{ env.new_tag }}\"/" backend/cmd/root.go
-        env:
-          new_tag: ${{ env.new_tag }}
-
-      # Build backend
-      - name: Build backend
+      - name: Run Go Mod Tidy
         run: |
           cd backend
           go mod tidy
-          go build -o netfetch
 
-      # Commit and push changes
-      - name: Commit and Push Changes
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_message: "feat: 🏗️ commit build artifacts"
-          branch: main
-          file_pattern: backend/netfetch backend/statik/statik.go
-          commit_user_name: 'deggja'
-          commit_user_email: 'danieldagfinrud@gmail.com'
+      - name: Bump version and tag
+        id: bump_version
+        run: |
+          chmod +x .github/scripts/bump_version.sh
+          .github/scripts/bump_version.sh
 
-      # Run GoReleaser
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
@@ -92,38 +41,3 @@ jobs:
           args: release --clean --debug
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      # Download the released binary
-      - name: Download Released Binary
-        run: |
-          curl -L "https://github.com/deggja/netfetch/releases/download/${{ env.new_tag }}/netfetch_${{ env.new_tag }}_darwin_amd64.tar.gz" -o "netfetch_release.tar.gz"
-        env:
-          new_tag: ${{ env.new_tag }}
-
-      # Calculate checksum of the released binary
-      - name: Calculate SHA256 Checksum of Released Binary
-        run: |
-          sha256sum netfetch_release.tar.gz > netfetch_sha256.txt
-
-      # Update homebrew formulae
-      - name: Update Homebrew Formula
-        run: |
-          SHA256=$(cat netfetch_sha256.txt | awk '{ print $1 }')
-          sed -i "s|url \".*\"|url \"https://github.com/deggja/netfetch/releases/download/${{ env.new_tag }}/netfetch_${{ env.new_tag }}_darwin_amd64.tar.gz\"|" netfetch.rb
-          sed -i "s/sha256 \".*\"/sha256 \"$SHA256\"/" netfetch.rb
-        env:
-          new_tag: ${{ env.new_tag }}
-      
-      # Commit and push final changes
-      - name: Commit and Push Homebrew Formula Update
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_message: "feat: update brew for version ${{ env.new_tag }}"
-          file_pattern: netfetch.rb
-          branch: main
-          commit_user_name: 'deggja'
-          commit_user_email: 'danieldagfinrud@gmail.com'
-        env:
-          new_tag: ${{ env.new_tag }}
-
-          
