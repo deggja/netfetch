@@ -23,7 +23,6 @@ var scanCmd = &cobra.Command{
 		}
 		_, err := k8s.ScanNetworkPolicies(namespace, dryRun, false, true, true, true)
 		if err != nil {
-			// Handle the error appropriately
 			fmt.Println("Error during scan:", err)
 			return
 		}

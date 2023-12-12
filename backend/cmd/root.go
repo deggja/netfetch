@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "1.0.4"
+const version = "1.0.5"
 
 var rootCmd = &cobra.Command{
 	Use:   "netfetch",
@@ -45,6 +45,5 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
 	rootCmd.AddCommand(versionCmd)
 }
