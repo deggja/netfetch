@@ -18,6 +18,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
@@ -384,13 +385,27 @@ func HandleNamespaceListRequest(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string][]string{"namespaces": namespaceList})
 }
 
-var isClientInitialized = false
+var (
+	isClientInitialized = false
+	clientset           *kubernetes.Clientset
+)
 
-// getClientset creates a new Kubernetes clientset
+// GetClientset creates a new Kubernetes clientset
 func GetClientset() (*kubernetes.Clientset, error) {
-	var kubeconfig string
+	if isClientInitialized {
+		return clientset, nil
+	}
 
-	if !isClientInitialized {
+	var config *rest.Config
+	var err error
+
+	// First try to use the in-cluster configuration
+	config, err = rest.InClusterConfig()
+	if err != nil {
+		fmt.Println("Mode: CLI")
+
+		// Fallback to kubeconfig
+		var kubeconfig string
 		if kc := os.Getenv("KUBECONFIG"); kc != "" {
 			kubeconfig = kc
 			fmt.Println("Using KUBECONFIG from environment:", kubeconfig)
@@ -398,21 +413,23 @@ func GetClientset() (*kubernetes.Clientset, error) {
 			kubeconfig = filepath.Join(homedir.HomeDir(), ".kube", "config")
 			fmt.Println("Using default kubeconfig path:", kubeconfig)
 		}
-		isClientInitialized = true
-	} else {
-		if kc := os.Getenv("KUBECONFIG"); kc != "" {
-			kubeconfig = kc
-		} else {
-			kubeconfig = filepath.Join(homedir.HomeDir(), ".kube", "config")
+
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build config from kubeconfig path %s: %v", kubeconfig, err)
 		}
+	} else {
+		fmt.Println("Using in-cluster Kubernetes configuration")
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	// Create and store the clientset
+	clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build config from path %s: %v", kubeconfig, err)
+		return nil, fmt.Errorf("failed to create clientset: %v", err)
 	}
 
-	return kubernetes.NewForConfig(config)
+	isClientInitialized = true
+	return clientset, nil
 }
 
 func HandleAddPolicyRequest(w http.ResponseWriter, r *http.Request) {
