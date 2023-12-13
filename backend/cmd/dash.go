@@ -29,6 +29,12 @@ func init() {
 	rootCmd.AddCommand(dashCmd)
 }
 
+func setNoCacheHeaders(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+}
+
 func startDashboardServer() {
 	// Verify connection to cluster or throw error
 	clientset, err := k8s.GetClientset()
@@ -89,6 +95,9 @@ func startDashboardServer() {
 // }
 
 func dashboardHandler(w http.ResponseWriter, r *http.Request) {
+	// Set cache control headers
+	setNoCacheHeaders(w)
+
 	statikFS, err := fs.New()
 	if err != nil {
 		log.Fatal(err)
@@ -111,6 +120,7 @@ func handleNamespacesWithPoliciesRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	setNoCacheHeaders(w)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(struct {
 		Namespaces []string `json:"namespaces"`
@@ -133,6 +143,7 @@ func handleClusterVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setNoCacheHeaders(w)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(clusterVizData); err != nil {
 		http.Error(w, "Failed to encode cluster visualization data", http.StatusInternalServerError)
