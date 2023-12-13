@@ -156,6 +156,7 @@ export default {
       isShowClusterMap: false,
       isClusterMapLoading: false,
       clusterVisualizationData: [],
+      backendPort: null,
     };
   },
   watch: {
@@ -232,6 +233,27 @@ export default {
     }
   },
   methods: {
+    async isBackendRunningOnPort(port) {
+      try {
+        await axios.get(`http://localhost:${port}/port`);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    },
+    async findAndSetBackendPort() {
+      const startPort = 8080;
+      const endPort = 8085; // Adjusted range
+      for (let port = startPort; port <= endPort; port++) {
+        const isRunning = await this.isBackendRunningOnPort(port);
+        if (isRunning) {
+          this.backendPort = port;
+          console.log(`Backend found on port ${port}`);
+          return;
+        }
+      }
+      console.error('Backend not found on any checked ports');
+    },
     toggleDarkMode() {
     this.isDarkMode = !this.isDarkMode;
     },
@@ -438,6 +460,7 @@ export default {
   mounted() {
       this.updateExpandedNamespaces();
       this.fetchAllNamespaces();
+      this.findAndSetBackendPort();
   },
 };
 </script>
