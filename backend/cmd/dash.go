@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -29,6 +30,8 @@ func init() {
 	rootCmd.AddCommand(dashCmd)
 }
 
+var port int
+
 func startDashboardServer() {
 	// Verify connection to cluster or throw error
 	clientset, err := k8s.GetClientset()
@@ -43,9 +46,14 @@ func startDashboardServer() {
 		return
 	}
 
+	var allowedOrigins []string
+	for port := 8080; port <= 8085; port++ {
+		allowedOrigins = append(allowedOrigins, fmt.Sprintf("http://localhost:%d", port))
+	}
+
 	// Set up CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:8081"},
+		AllowedOrigins: allowedOrigins,
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Content-Type", "X-CSRF-Token"},
 	})
@@ -53,6 +61,7 @@ func startDashboardServer() {
 	// Set up handlers
 	http.HandleFunc("/", dashboardHandler)
 	http.HandleFunc("/scan", k8s.HandleScanRequest)
+	http.HandleFunc("/port", handlePort)
 	http.HandleFunc("/namespaces", k8s.HandleNamespaceListRequest)
 	http.HandleFunc("/add-policy", k8s.HandleAddPolicyRequest)
 	http.HandleFunc("/namespaces-with-policies", handleNamespacesWithPoliciesRequest)
@@ -63,12 +72,28 @@ func startDashboardServer() {
 	// Wrap the default serve mux with the CORS middleware
 	handler := c.Handler(http.DefaultServeMux)
 
-	// Start the server
-	port := "8080"
-	fmt.Printf("Starting dashboard server on http://localhost:%s\n", port)
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
-		log.Fatalf("Failed to start server: %v\n", err)
+	port = 8080
+	for {
+		addr := fmt.Sprintf(":%d", port)
+		fmt.Printf("Trying to start dashboard server on http://localhost%s\n", addr)
+		if err := http.ListenAndServe(addr, handler); err != nil {
+			if strings.Contains(err.Error(), "address already in use") {
+				fmt.Printf("Port %d is in use, trying the next one...\n", port)
+				port++
+			} else {
+				log.Fatalf("Failed to start server: %v\n", err)
+			}
+		} else {
+			break
+		}
 	}
+}
+
+func handlePort(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct {
+		Port int `json:"port"`
+	}{Port: port})
 }
 
 // func dashboardHandler(w http.ResponseWriter, r *http.Request) {
