@@ -2,7 +2,8 @@
 
 ## Contents
 - [What is this project?](#using-netfetch)
-  - [Installation via Homebrew for Mac](#installation-via-homebrew-for-mac)
+  - [Install with brew](#installation-via-homebrew-for-mac)
+  - [Install in Kubernetes]( #installation-via-helm)
   - [How to use](#usage)
   - [Dashboard](#dashboard)
   - [Score](#netfetch-score)
@@ -38,6 +39,8 @@ helm repo add deggja https://deggja.github.io/netfetch/
 helm repo update
 helm install netfetch deggja/netfetch --namespace netfetch --create-namespace
 ```
+
+Follow the instructions after deployment to access the dashboard.
 
 ## Update netfetch
 
