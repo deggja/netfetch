@@ -3,12 +3,12 @@ entries:
   netfetch:
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2023-12-12T23:57:07.508655+01:00"
+    created: "2023-12-13T09:27:37.550931+01:00"
     description: A Helm chart enabling netfetch to run in a Kubernetes deployment.
     digest: b29eaa57ec523cfc1c4e911d6511096c79b693bbc647f75eb94578b68e1fb2f6
     name: netfetch
     type: application
     urls:
-    - https://deggja.github.io/netfetch-0.1.0.tgz
+    - https://deggja.github.io/netfetch/netfetch-0.1.0.tgz
     version: 0.1.0
-generated: "2023-12-12T23:57:07.50698+01:00"
+generated: "2023-12-13T09:27:37.549559+01:00"
