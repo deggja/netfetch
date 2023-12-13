@@ -153,6 +153,14 @@ You are welcome to contribute!
 
 See [CONTRIBUTING](CONTRIBUTING.md) for instructions on how to proceed.
 
+## Tools
+Netfetch uses other tools for a plethora of different things. It would not be possible without the following:
+
+- [statik](https://github.com/rakyll/statik)
+- [D3](https://d3-graph-gallery.com/network.html)
+- [Helm](https://helm.sh/docs/)
+- [Brew](https://brew.sh/)
+
 ## License
 
 Netfetch is distributed under the MIT License. See the [LICENSE](LICENSE) for more information.
