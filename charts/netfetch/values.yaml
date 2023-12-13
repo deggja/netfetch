@@ -35,13 +35,17 @@ service:
 ingress:
   enabled: false
   className: ""
-  annotations: {}
+  annotations:
+   # cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
     - host: netfetch.example.local  # Update this to reflect your domain
       paths:
         - path: /
           pathType: ImplementationSpecific
-  tls: []
+  tls:
+    - hosts:
+        - myapp.example.com
+      secretName: netfetch-tls
 
 resources: {}
 
