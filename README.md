@@ -31,13 +31,11 @@ For specific Linux distros, Windows and other install binaries, check the latest
 
 ## Installation via Helm
 
-You can deploy `netfetch` in your Kubernetes clusters using Helm.^
+You can deploy the `netfetch` dashboard in your Kubernetes clusters using Helm.
 
 ```sh
-helm repo add deggja https://deggja.github.io/
-
+helm repo add deggja https://deggja.github.io/netfetch/
 helm repo update
-
 helm install netfetch deggja/netfetch --namespace netfetch
 ```
 
