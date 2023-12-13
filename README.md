@@ -36,7 +36,7 @@ You can deploy the `netfetch` dashboard in your Kubernetes clusters using Helm.
 ```sh
 helm repo add deggja https://deggja.github.io/netfetch/
 helm repo update
-helm install netfetch deggja/netfetch --namespace netfetch
+helm install netfetch deggja/netfetch --namespace netfetch --create-namespace
 ```
 
 ## Update netfetch
