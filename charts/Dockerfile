@@ -31,8 +31,8 @@ FROM debian:latest
 
 WORKDIR /usr/local/bin/
 
-# Copy the compiled Go binary and static files
-COPY --from=gobuilder /app/backend/netfetch /app/backend/statik /usr/local/bin/
+# Copy the compiled Go binary
+COPY --from=gobuilder /app/backend/netfetch /usr/local/bin/
 
 # Install any runtime dependencies here (if necessary)
 
