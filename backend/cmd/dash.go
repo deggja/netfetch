@@ -61,10 +61,13 @@ func startDashboardServer() {
 	http.HandleFunc("/scan", k8s.HandleScanRequest)
 	http.HandleFunc("/namespaces", k8s.HandleNamespaceListRequest)
 	http.HandleFunc("/add-policy", k8s.HandleAddPolicyRequest)
+	http.HandleFunc("/create-policy", HandleCreatePolicyRequest)
 	http.HandleFunc("/namespaces-with-policies", handleNamespacesWithPoliciesRequest)
+	http.HandleFunc("/namespace-policies", handleNamespacePoliciesRequest)
 	http.HandleFunc("/visualization", k8s.HandleVisualizationRequest)
 	http.HandleFunc("/visualization/cluster", handleClusterVisualizationRequest)
 	http.HandleFunc("/policy-yaml", k8s.HandlePolicyYAMLRequest)
+	http.HandleFunc("/pod-info", handlePodInfoRequest)
 
 	// Wrap the default serve mux with the CORS middleware
 	handler := c.Handler(http.DefaultServeMux)
@@ -129,6 +132,42 @@ func handleNamespacesWithPoliciesRequest(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+// handleNamespacePoliciesRequest handles the HTTP request for serving a list of network policies in a namespace.
+func handleNamespacePoliciesRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract the namespace parameter from the query string
+	namespace := r.URL.Query().Get("namespace")
+	if namespace == "" {
+		http.Error(w, "Namespace parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	// Obtain the Kubernetes clientset
+	clientset, err := k8s.GetClientset()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create Kubernetes client: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch network policies from the specified namespace
+	policies, err := clientset.NetworkingV1().NetworkPolicies(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get network policies: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Convert the list of network policies to a more simple structure if needed or encode directly
+	// For example, you might want to return only the names and some identifiers of the policies
+
+	setNoCacheHeaders(w)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(policies)
+}
+
 // handleClusterVisualizationRequest handles the HTTP request for serving cluster-wide visualization data.
 func handleClusterVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -148,4 +187,76 @@ func handleClusterVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(clusterVizData); err != nil {
 		http.Error(w, "Failed to encode cluster visualization data", http.StatusInternalServerError)
 	}
+}
+
+// handlePodInfoRequest handles the HTTP request for serving pod information.
+func handlePodInfoRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract the namespace parameter from the query string
+	namespace := r.URL.Query().Get("namespace")
+	if namespace == "" {
+		http.Error(w, "Namespace parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	// Obtain the Kubernetes clientset
+	clientset, err := k8s.GetClientset()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create Kubernetes client: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch pod information from the specified namespace
+	podInfo, err := k8s.GetPodInfo(clientset, namespace)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get pod information: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	setNoCacheHeaders(w)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(podInfo)
+}
+
+// HandleCreatePolicyRequest handles the HTTP request to create a network policy from YAML.
+func HandleCreatePolicyRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var policyRequest struct {
+		YAML      string `json:"yaml"`
+		Namespace string `json:"namespace"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&policyRequest); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to decode request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	clientset, err := k8s.GetClientset()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create Kubernetes client: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	networkPolicy, err := k8s.YAMLToNetworkPolicy(policyRequest.YAML)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to parse network policy YAML: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	createdPolicy, err := clientset.NetworkingV1().NetworkPolicies(policyRequest.Namespace).Create(context.Background(), networkPolicy, metav1.CreateOptions{})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create network policy: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(createdPolicy)
 }
