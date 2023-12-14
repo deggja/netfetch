@@ -49,6 +49,7 @@
             {{ namespace }}
           </option>
         </select>
+        <button @click="suggestPolicy" class="scan-btn">Suggest policy</button>
         </div>
         <button @click="generateClusterNetworkMap" class="scan-btn create-cluster-map-btn">Create cluster map</button>
       </div>
@@ -59,6 +60,33 @@
           {{ message.text }}
         </div>
       </div>
+      <section v-if="suggestedNetworkPolicies.length > 0" class="policy-container">
+        <h3 class="policy-header">Suggested network policies for {{ selectedNamespace }}</h3>
+        <div class="policy-cards-container">
+          <div class="policy-card" v-for="(policy, index) in displayedPolicies" :key="index">
+            <!-- Display textarea if editIndex matches, otherwise display policy -->
+            <textarea v-if="editIndex === index" v-model="editablePolicy" class="policy-edit" ref="textarea"></textarea>
+            <pre v-else class="policy-yaml">{{ policy }}</pre>
+            <!-- Change button text based on edit mode -->
+            <button v-if="editIndex === index" @click="savePolicyChanges">
+              Save
+            </button>
+            <button v-else @click="editPolicy(index)">
+              Edit
+            </button>
+            <button @click="copyToClipboard(policy, index)">
+              {{ copyButtonTexts[index] || 'Copy' }}
+            </button>
+            <button @click="createPolicy(policy, selectedNamespace)">
+              Create
+            </button>
+          </div>
+        </div>
+        <div class="policy-pagination">
+          <button @click="previousPolicySet" :disabled="currentPolicySetStart === 0" class="pagination-btn">Previous</button>
+          <button @click="nextPolicySet" :disabled="currentPolicySetStart + policySetSize >= suggestedNetworkPolicies.length" class="pagination-btn">Next</button>
+        </div>
+      </section>
       <div class="table-container">
         <!-- Unprotected Pods Table -->
         <section v-if="unprotectedPods.length > 0 && scanInitiated">
@@ -129,6 +157,7 @@
 <script>
 import axios from 'axios';
 import NetworkPolicyVisualization from './Viz.vue';
+import yaml from 'js-yaml';
 
 export default {
   name: 'App',
@@ -156,6 +185,16 @@ export default {
       isShowClusterMap: false,
       isClusterMapLoading: false,
       clusterVisualizationData: [],
+      suggestedNetworkPolicies: [],
+      currentPolicyIndex: 0,
+      policySetSize: 3,
+      currentPolicySetStart: 0,
+      copyButtonTexts: {},
+      editButtonTexts: {},
+      editMode: {},
+      editablePolicies: {},
+      editablePolicy: '',
+      editIndex: null,
     };
   },
   watch: {
@@ -166,6 +205,9 @@ export default {
     },
   },
   computed: {
+    displayedPolicies() {
+      return this.suggestedNetworkPolicies.slice(this.currentPolicySetStart, this.currentPolicySetStart + this.policySetSize);
+    },
     groupedPods() {
       return this.unprotectedPods.reduce((acc, pod) => {
         if (!acc[pod.namespace]) {
@@ -232,6 +274,64 @@ export default {
     }
   },
   methods: {
+    editPolicy(index) {
+      this.editIndex = index;
+      this.editablePolicy = this.suggestedNetworkPolicies[index];
+    },  
+    // Called when the "Save" button is clicked
+    savePolicyChanges() {
+      if (this.editIndex !== null) {
+        this.suggestedNetworkPolicies[this.editIndex] = this.editablePolicy;
+        
+        this.editIndex = null;
+        this.editablePolicy = '';
+      }
+    },
+    async createPolicy(policyYaml, namespace) {
+      try {
+        const response = await axios.post('/create-policy', {
+          yaml: policyYaml,
+          namespace: namespace,
+        });
+        if (response.status === 200) {
+          console.log('Policy created successfully:', response.data);
+          // Handle successful creation here, maybe by displaying a success message
+        } else {
+          console.error('Policy creation failed with status:', response.status);
+          // Handle failure here
+        }
+      } catch (error) {
+        console.error('Policy creation failed with error:', error);
+        // Handle error here, maybe by displaying an error message
+      }
+    },
+    copyToClipboard(policyYaml, index) {
+      navigator.clipboard.writeText(policyYaml)
+        .then(() => {
+          // Update the button text to indicate the copy was successful
+          this.copyButtonTexts[index] = 'Copied';
+
+          // Revert the button text back to 'Copy' after 2 seconds
+          setTimeout(() => {
+            this.copyButtonTexts[index] = 'Copy';  // Use assignment here
+          }, 1000);
+        })
+        .catch(err => {
+          console.error('Failed to copy text: ', err);
+        });
+    },
+    nextPolicySet() {
+    const nextStart = this.currentPolicySetStart + this.policySetSize;
+    if (nextStart < this.suggestedNetworkPolicies.length) {
+      this.currentPolicySetStart = nextStart;
+      }
+    },
+    previousPolicySet() {
+      const prevStart = this.currentPolicySetStart - this.policySetSize;
+      if (prevStart >= 0) {
+        this.currentPolicySetStart = prevStart;
+      }
+    },
     toggleDarkMode() {
     this.isDarkMode = !this.isDarkMode;
     },
@@ -308,6 +408,109 @@ export default {
       } catch (error) {
         this.message = { type: 'error', text: `Failed to apply policy to namespace: ${namespace}. Error: ${error.message}` };
         console.error('Error applying policy to', namespace, ':', error);
+      }
+    },
+    async suggestPolicy() {
+      if (!this.selectedNamespace) {
+        alert('Please select a namespace.');
+        return;
+      }
+
+      try {
+        const podInfo = await this.fetchPodInfo(this.selectedNamespace);
+        if (!podInfo || !Array.isArray(podInfo)) {
+          console.error('No pod information available for the namespace:', this.selectedNamespace);
+          return; // Return early if no pod information is available
+        }
+
+        const existingPolicies = await this.fetchExistingPolicies(this.selectedNamespace);
+
+        // Generate network policy suggestions
+        let suggestedPolicies = this.suggestNetworkPolicy(podInfo);
+
+        // Filter out policies that already exist
+        suggestedPolicies = suggestedPolicies.filter(policy => {
+          const policyName = yaml.load(policy).metadata.name;
+          return !existingPolicies.includes(policyName);
+        });
+
+        this.suggestedNetworkPolicies = suggestedPolicies;
+
+        console.log(this.suggestedNetworkPolicies);
+      } catch (error) {
+        console.error('Error suggesting policies:', error);
+      }
+    },
+    suggestNetworkPolicy(podData) {
+      let policies = [];
+
+      if (!Array.isArray(podData)) {
+        // Handle the error. For example, log the error or set an error state.
+        console.error('Invalid podData: Expected an array, received:', podData);
+        return []; // Return an empty array or an appropriate value indicating no policies.
+      }
+
+      podData.forEach(pod => {
+        let appName = pod.Labels['app.kubernetes.io/name'] || 'unknown-app';
+        let matchLabels = {};
+        if (pod.Labels['app.kubernetes.io/name']) {
+          matchLabels['app.kubernetes.io/name'] = pod.Labels['app.kubernetes.io/name'];
+        }
+        if (pod.Labels['app']) {
+          matchLabels['app'] = pod.Labels['app'];
+        }
+
+        // Only create policies if Ports are defined
+        if (Array.isArray(pod.Ports) && pod.Ports.length > 0) {
+          pod.Ports.forEach(port => {
+            const policyName = `allow-${appName}-${port.containerPort}-${port.protocol.toLowerCase()}-nfpol`.replace(/[^a-zA-Z0-9-]/g, '-');
+            policies.push({
+              apiVersion: 'networking.k8s.io/v1',
+              kind: 'NetworkPolicy',
+              metadata: {
+                name: policyName,
+                namespace: pod.Namespace
+              },
+              spec: {
+                podSelector: {
+                  matchLabels: matchLabels
+                },
+                policyTypes: ['Ingress', 'Egress'],
+                ingress: [{
+                  from: [],
+                  ports: [{ protocol: port.protocol, port: port.containerPort }]
+                }],
+                egress: [{
+                  to: [{ ipBlock: { cidr: '0.0.0.0/0' } }],
+                  ports: [{ protocol: port.protocol, port: port.containerPort }]
+                }]
+              }
+            });
+          });
+        }
+        // No else block - do not create policies if there are no Ports
+      });
+
+      return policies.map(policy => yaml.dump(policy));
+    },
+    async fetchExistingPolicies(namespace) {
+      try {
+        const response = await axios.get(`http://localhost:8080/namespace-policies?namespace=${namespace}`);
+        return response.data.items.map(policy => policy.metadata.name);
+      } catch (error) {
+        console.error('Error fetching existing policies:', error);
+        return [];
+      }
+    },
+    async fetchPodInfo(namespace) {
+      try {
+        const response = await axios.get(`http://localhost:8080/pod-info?namespace=${namespace}`);
+        // Check if the data is present and is an array, else return an empty array
+        return Array.isArray(response.data) ? response.data : [];
+      } catch (error) {
+        console.error('Error fetching pod information:', error);
+        // Return an empty array to indicate no pods were found or there was an error
+        return [];
       }
     },
     showSuccessMessage(namespace) {
@@ -613,6 +816,76 @@ text-align: center;
   padding: 10px;
   border-radius: 5px;
   text-align: center;
+}
+
+/* Policy container */
+.policy-container {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 5px;
+}
+
+.policy-header {
+  margin-bottom: 20px;
+}
+
+.policy-cards-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 20px;
+}
+
+.policy-card {
+  border: 1px solid #87CEEB;
+  border-radius: 5px;
+  padding: 10px;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.policy-card textarea {
+  width: 100%;
+  height: 95%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #87CEEB;
+  font-family: monospace;
+  resize: none;
+}
+
+
+.policy-yaml {
+  white-space: pre-wrap;
+  margin-bottom: 0;
+}
+
+.policy-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.policy-card button {
+  padding: 5px 10px;
+  margin: 0;
+  background: white;
+  color: black;
+  border: 1px solid #87CEEB;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.policy-card-buttons {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+}
+
+.policy-card button:hover {
+  background-color: #5cb7db;
 }
 
 /* Table container */
