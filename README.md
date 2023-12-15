@@ -7,7 +7,6 @@
   - [How to use](#usage)
   - [Dashboard](#dashboard)
   - [Score](#netfetch-score)
-  - [Updating](#update-netfetch)
   - [Uninstalling](#uninstalling-netfetch)
 - [Contribute](#contribute)
 
