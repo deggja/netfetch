@@ -227,7 +227,7 @@
         creationError: '',
         isShowTooltip: false,
         activeNamespaceForPolicies: '',
-        remediateTooltipText: 'The Remediate action will create a implicit default deny all ingress and egress network policy in your namespace. This will deny all traffic coming to and from the pods. In addition to doing this, you should create network policies to allow the neccessary traffic from and to your applications. You can do this manually or by using the Suggest policy button.'
+        remediateTooltipText: 'Remediate will create a default deny all ingress and egress network policy in the namespace. This will deny all traffic coming to and from the pods. In addition to doing this, you must create network policies to allow the required traffic from and to your pods. You can do this by using the Suggest policy button.'
       };
     },
     watch: {
@@ -902,11 +902,12 @@
   position: relative;
   display: inline-block;
   cursor: pointer;
+  z-index: 1500;
 }
 
 .tooltiptext {
   visibility: hidden;
-  width: 400px;
+  width: 600px;
   background-color: white;
   color: rgb(55, 54, 54);
   text-align: left;
@@ -914,7 +915,7 @@
   font-size: 13px;
   padding: 8px 12px;
   position: absolute;
-  z-index: 1;
+  z-index: 1400;
   bottom: 125%;
   left: 50%;
   transform: translateX(-50%);
