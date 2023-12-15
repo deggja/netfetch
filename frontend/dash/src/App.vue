@@ -56,30 +56,39 @@
 
       <div class="message-container">
         <!-- Success or Error Message Display -->
-        <div v-if="message" :class="{'success-message': message.type === 'success', 'error-message': message.type === 'error'}">
+        <div v-if="message" :class="{'notification success': message.type === 'success', 'error': message.type === 'notification error'}">
           {{ message.text }}
         </div>
       </div>
       <section v-if="suggestedNetworkPolicies.length > 0" class="policy-container">
         <h3 class="policy-header">Suggested network policies for {{ selectedNamespace }}</h3>
+          <div v-if="creationMessage" class="notification success">{{ creationMessage }}</div>
+          <div v-if="creationError" class="notification error">{{ creationError }}</div>
         <div class="policy-cards-container">
           <div class="policy-card" v-for="(policy, index) in displayedPolicies" :key="index">
             <!-- Display textarea if editIndex matches, otherwise display policy -->
             <textarea v-if="editIndex === index" v-model="editablePolicy" class="policy-edit" ref="textarea"></textarea>
             <pre v-else class="policy-yaml">{{ policy }}</pre>
-            <!-- Change button text based on edit mode -->
-            <button v-if="editIndex === index" @click="savePolicyChanges">
-              Save
-            </button>
-            <button v-else @click="editPolicy(index)">
-              Edit
-            </button>
-            <button @click="copyToClipboard(policy, index)">
-              {{ copyButtonTexts[index] || 'Copy' }}
-            </button>
-            <button @click="createPolicy(policy, selectedNamespace)">
-              Create
-            </button>
+            <div class="copy-container">
+              <button @click="copyToClipboard(policy, index, $event)" class="button-copy" :title="copyButtonTexts[index] || 'Copy'">
+                <!-- Inline SVG content -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 111.07 122.88" class="copy-icon" ref="copy-icon-${index}">
+                  <path class="st0" d="M97.67,20.81L97.67,20.81l0.01,0.02c3.7,0.01,7.04,1.51,9.46,3.93c2.4,2.41,3.9,5.74,3.9,9.42h0.02v0.02v75.28 v0.01h-0.02c-0.01,3.68-1.51,7.03-3.93,9.46c-2.41,2.4-5.74,3.9-9.42,3.9v0.02h-0.02H38.48h-0.01v-0.02 c-3.69-0.01-7.04-1.5-9.46-3.93c-2.4-2.41-3.9-5.74-3.91-9.42H25.1c0-25.96,0-49.34,0-75.3v-0.01h0.02 c0.01-3.69,1.52-7.04,3.94-9.46c2.41-2.4,5.73-3.9,9.42-3.91v-0.02h0.02C58.22,20.81,77.95,20.81,97.67,20.81L97.67,20.81z M0.02,75.38L0,13.39v-0.01h0.02c0.01-3.69,1.52-7.04,3.93-9.46c2.41-2.4,5.74-3.9,9.42-3.91V0h0.02h59.19 c7.69,0,8.9,9.96,0.01,10.16H13.4h-0.02v-0.02c-0.88,0-1.68,0.37-2.27,0.97c-0.59,0.58-0.96,1.4-0.96,2.27h0.02v0.01v3.17 c0,19.61,0,39.21,0,58.81C10.17,83.63,0.02,84.09,0.02,75.38L0.02,75.38z M100.91,109.49V34.2v-0.02h0.02 c0-0.87-0.37-1.68-0.97-2.27c-0.59-0.58-1.4-0.96-2.28-0.96v0.02h-0.01H38.48h-0.02v-0.02c-0.88,0-1.68,0.38-2.27,0.97 c-0.59,0.58-0.96,1.4-0.96,2.27h0.02v0.01v75.28v0.02h-0.02c0,0.88,0.38,1.68,0.97,2.27c0.59,0.59,1.4,0.96,2.27,0.96v-0.02h0.01 h59.19h0.02v0.02c0.87,0,1.68-0.38,2.27-0.97c0.59-0.58,0.96-1.4,0.96-2.27L100.91,109.49L100.91,109.49L100.91,109.49 L100.91,109.49z"/>
+                </svg>
+              </button>
+            </div>
+            <div class="action buttons">
+              <!-- Change button text based on edit mode -->
+              <button v-if="editIndex === index" @click="savePolicyChanges">
+                Save
+              </button>
+              <button v-else @click="editPolicy(index)">
+                Edit
+              </button> 
+              <button @click="createPolicy(policy, selectedNamespace)">
+                Create
+              </button>
+            </div>
           </div>
         </div>
         <div class="policy-pagination">
@@ -184,6 +193,7 @@ export default {
       isLoadingVisualization: false,
       isShowClusterMap: false,
       isClusterMapLoading: false,
+      isShowScanCompletedMessage: false,
       clusterVisualizationData: [],
       suggestedNetworkPolicies: [],
       currentPolicyIndex: 0,
@@ -195,6 +205,8 @@ export default {
       editablePolicies: {},
       editablePolicy: '',
       editIndex: null,
+      creationMessage: '',
+      creationError: '',
     };
   },
   watch: {
@@ -274,6 +286,7 @@ export default {
     }
   },
   methods: {
+    
     editPolicy(index) {
       this.editIndex = index;
       this.editablePolicy = this.suggestedNetworkPolicies[index];
@@ -294,27 +307,29 @@ export default {
           namespace: namespace,
         });
         if (response.status === 200) {
-          console.log('Policy created successfully:', response.data);
-          // Handle successful creation here, maybe by displaying a success message
+          this.creationMessage = 'Policy created successfully!';
+          this.creationError = '';
         } else {
-          console.error('Policy creation failed with status:', response.status);
-          // Handle failure here
+          this.creationError = `Policy creation failed with status: ${response.status}`;
+          this.creationMessage = '';
         }
       } catch (error) {
-        console.error('Policy creation failed with error:', error);
-        // Handle error here, maybe by displaying an error message
+        this.creationError = 'Policy creation failed. ' + (error.response?.data || error.message);
+        this.creationMessage = ''; // Clear any previous messages
       }
     },
-    copyToClipboard(policyYaml, index) {
+    copyToClipboard(policyYaml, index, event) {
       navigator.clipboard.writeText(policyYaml)
         .then(() => {
-          // Update the button text to indicate the copy was successful
-          this.copyButtonTexts[index] = 'Copied';
-
-          // Revert the button text back to 'Copy' after 2 seconds
-          setTimeout(() => {
-            this.copyButtonTexts[index] = 'Copy';  // Use assignment here
-          }, 1000);
+          // Use the event target to find the closest button ancestor in case the SVG is not a direct child
+          const button = event.target.closest('button');
+          const svgIcon = button ? button.querySelector('svg') : null;
+          if (svgIcon) {
+            svgIcon.classList.add('copy-success');
+            setTimeout(() => {
+              svgIcon.classList.remove('copy-success');
+            }, 1000);
+          }
         })
         .catch(err => {
           console.error('Failed to copy text: ', err);
@@ -445,7 +460,6 @@ export default {
       let policies = [];
 
       if (!Array.isArray(podData)) {
-        // Handle the error. For example, log the error or set an error state.
         console.error('Invalid podData: Expected an array, received:', podData);
         return []; // Return an empty array or an appropriate value indicating no policies.
       }
@@ -481,8 +495,7 @@ export default {
                   ports: [{ protocol: port.protocol, port: port.containerPort }]
                 }],
                 egress: [{
-                  to: [{ ipBlock: { cidr: '0.0.0.0/0' } }],
-                  ports: [{ protocol: port.protocol, port: port.containerPort }]
+                  to: [{ ipBlock: { cidr: '0.0.0.0/0' } }]
                 }]
               }
             });
@@ -802,20 +815,22 @@ text-align: center;
   margin-bottom: 20px;
 }
 
-.success-message {
-  background-color: #28a745;
-  color: #fff;
+.notification {
   padding: 10px;
+  margin: 10px 0;
   border-radius: 5px;
   text-align: center;
 }
+.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
 
-.error-message {
-  background-color: #dc3545;
-  color: #fff;
-  padding: 10px;
-  border-radius: 5px;
-  text-align: center;
+.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
 /* Policy container */
@@ -843,6 +858,7 @@ text-align: center;
   padding: 10px;
   background-color: #fff;
   overflow: hidden;
+  position: relative;
 }
 
 .policy-card textarea {
@@ -869,7 +885,7 @@ text-align: center;
 }
 
 .policy-card button {
-  padding: 5px 10px;
+  padding: 3px 5px;
   margin: 0;
   background: white;
   color: black;
@@ -886,6 +902,29 @@ text-align: center;
 
 .policy-card button:hover {
   background-color: #5cb7db;
+}
+
+.copy-container {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.copy-icon {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.copy-success {
+  fill: #d4edda;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 /* Table container */
