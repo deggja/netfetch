@@ -14,10 +14,13 @@ import (
 	"path/filepath"
 
 	"github.com/AlecAivazis/survey/v2"
+	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -485,4 +488,60 @@ func containsPodDetail(slice []string, detail string) bool {
 		}
 	}
 	return false
+}
+
+// PodInfo holds the desired information from a Pods YAML.
+type PodInfo struct {
+	Name      string
+	Namespace string
+	Labels    map[string]string
+	Ports     []v1.ContainerPort
+}
+
+// Hold the desired info from a Pods ports
+type ContainerPortInfo struct {
+	Name          string
+	ContainerPort int32
+	Protocol      v1.Protocol
+}
+
+func GetPodInfo(clientset *kubernetes.Clientset, namespace string) ([]PodInfo, error) {
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var podInfos []PodInfo
+	for _, pod := range pods.Items {
+		var containerPorts []v1.ContainerPort
+		for _, container := range pod.Spec.Containers {
+			containerPorts = append(containerPorts, container.Ports...)
+		}
+
+		podInfo := PodInfo{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Labels:    pod.Labels,
+			Ports:     containerPorts,
+		}
+		podInfos = append(podInfos, podInfo)
+	}
+
+	return podInfos, nil
+}
+
+// YAMLToNetworkPolicy converts a YAML string to a NetworkPolicy object.
+func YAMLToNetworkPolicy(yamlContent string) (*networkingv1.NetworkPolicy, error) {
+	decoder := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer()
+	obj, _, err := decoder.Decode([]byte(yamlContent), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	networkPolicy, ok := obj.(*networkingv1.NetworkPolicy)
+	if !ok {
+		return nil, fmt.Errorf("decoded object is not a NetworkPolicy")
+	}
+
+	return networkPolicy, nil
 }
