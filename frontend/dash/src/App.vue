@@ -511,9 +511,6 @@
           if (pod.Labels['app.kubernetes.io/name']) {
             matchLabels['app.kubernetes.io/name'] = pod.Labels['app.kubernetes.io/name'];
           }
-          if (pod.Labels['app']) {
-            matchLabels['app'] = pod.Labels['app'];
-          }
 
           if (Array.isArray(pod.Ports) && pod.Ports.length > 0) {
             pod.Ports.forEach(port => {
@@ -557,7 +554,7 @@
         });
 
         return policies.map(policy => yaml.dump(policy));
-      },
+    },
       async fetchExistingPolicies(namespace) {
         try {
           const response = await axios.get(`http://localhost:8080/namespace-policies?namespace=${namespace}`);
