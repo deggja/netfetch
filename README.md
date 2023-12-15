@@ -11,15 +11,28 @@
   - [Uninstalling](#uninstalling-netfetch)
 - [Contribute](#contribute)
 
-## What is this project?
+## ⭐ What is this project ⭐
 
-This project aims to simplify the mapping of network policies in a Kubernetes cluster. It's a work in progress!
+This project aims to demystify network policies in Kubernetes. It's a work in progress!
 
-The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, checking whether implicit default deny policies are in place and examining if there are any other policies targeting the pods.
+The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, checking if your workloads are targeted by a network policy or not.
 
-This document guides you on how to use `netfetch` to perform these scans.
+What can I use `netfetch` for? 🤔
 
-## Installation via Homebrew for Mac
+CLI:
+- Scan your Kubernetes cluster or namespace to identify pods running with no ingress and egress restrictions.
+- Save the output of your scans in a text file to analyze.
+- Create implicit default deny network policies in namespaces that do not have one.
+- Get a score calculated for your cluster or namespace based on the findings of the scans.
+
+Dashboard:
+- Scan your cluster or namespace and list pods running without network restrictions in a table.
+- Visualise all existing network policies and pods in your cluster or namespace in a network map you can interact with.
+- Double click a network policy in a network map to preview the YAML of that policy.
+- Create implicit default deny network policies in namespaces that do not have one.
+- Get suggestions for network policies that you can edit & apply to your namespaces by analysing existing pods.
+
+## Installation via Homebrew for Mac 💻
 
 You can install `netfetch` using our Homebrew tap:
 
@@ -30,7 +43,7 @@ brew install netfetch
 
 For specific Linux distros, Windows and other install binaries, check the latest release.
 
-## Installation via Helm
+## Installation via Helm 🎩
 
 You can deploy the `netfetch` dashboard in your Kubernetes clusters using Helm.
 
@@ -42,29 +55,6 @@ helm install netfetch deggja/netfetch --namespace netfetch --create-namespace
 
 Follow the instructions after deployment to access the dashboard.
 
-## Update netfetch
-
-If you are running an older version of the application - you can update `netfetch` by running the following commands.
-
-```sh
-brew update
-netfetch version # verify that you are running the latest version
-```
-
-This will fetch the latest updates from the Homebrew tap.
-
-If you are experiencing issues trying to fetch the latest version, you can run the following to commands:
-
-```sh
-brew uninstall netfetch
-brew cleanup -s netfetch
-brew update
-brew install netfetch
-netfetch version # verify that you are running the latest version
-```
-
-This should clean up any traces of the old version, update the Homebrew tap and refresh the binary.
-
 ## Uninstalling netfetch
 
 If you want to uninstall the application - you can do so by running the following commands.
@@ -75,13 +65,11 @@ brew cleanup -s netfetch
 brew untap deggja/netfetch https://github.com/deggja/netfetch
 ```
 
-### Prerequisites
+### Prerequisites 🌌
 
-Before you begin, ensure you have the following:
-
-- `netfetch` binary installed in your system.
-- Access to a Kubernetes cluster with configured `kubectl`.
-- Permissions to read and create network policies in at least one namespace.
+- Installed `netfetch` via homebrew or a release binary.
+- Access to a Kubernetes cluster with `kubectl` configured.
+- Permissions to read and create network policies.
 
 ### Usage
 
@@ -115,9 +103,9 @@ Scan a namespace called production.
 netfetch scan production
 ```
 
-### Dashboard
+### Using the dashboard 📟
 
-Launch dashboard.
+Launch the dashboard:
 
 ```sh
 netfetch dash
@@ -139,8 +127,7 @@ Inside the network map visualisations, you can double click the network policy n
 
 ![Network map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_network_map.png)
 
-
-## Netfetch score
+## Netfetch score 🥇
 
 The `netfetch` tool provides a basic score at the end of each scan. The score ranges from 1 to 42, with 1 being the lowest and 42 being the highest possible score.
 
@@ -148,12 +135,12 @@ As of today, your score will decrease if you are missing implicit default deny a
 
 The score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
 
-## Contribute
+## Contribute 🔨
 You are welcome to contribute!
 
 See [CONTRIBUTING](CONTRIBUTING.md) for instructions on how to proceed.
 
-## Tools
+## Tools 🧰
 Netfetch uses other tools for a plethora of different things. It would not be possible without the following:
 
 - [statik](https://github.com/rakyll/statik)
