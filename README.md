@@ -1,14 +1,14 @@
 ![image](https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7)
 
 ## Contents
-- [What is this project?](#using-netfetch)
-  - [Install with brew](#installation-via-homebrew-for-mac)
-  - [Install in Kubernetes]( #installation-via-helm)
+- [What is this project?](#⭐-what-is-this-project-⭐)
+  - [Install with brew](#installation-via-homebrew-for-mac-💻)
+  - [Install in Kubernetes](#installation-via-helm-🎩)
   - [How to use](#usage)
-  - [Dashboard](#dashboard)
+  - [Dashboard](#using-the-dashboard-📟)
   - [Score](#netfetch-score)
   - [Uninstalling](#uninstalling-netfetch)
-- [Contribute](#contribute)
+- [Contribute](#contribute-🔨)
 
 ## ⭐ What is this project ⭐
 
@@ -54,16 +54,6 @@ helm install netfetch deggja/netfetch --namespace netfetch --create-namespace
 ```
 
 Follow the instructions after deployment to access the dashboard.
-
-## Uninstalling netfetch
-
-If you want to uninstall the application - you can do so by running the following commands.
-
-```
-brew uninstall netfetch
-brew cleanup -s netfetch
-brew untap deggja/netfetch https://github.com/deggja/netfetch
-```
 
 ### Prerequisites 🌌
 
@@ -134,6 +124,16 @@ The `netfetch` tool provides a basic score at the end of each scan. The score ra
 As of today, your score will decrease if you are missing implicit default deny all network policies in your namespace or cluster. It will also decrease based on the amount of pods not targeted by a network policy.
 
 The score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
+
+## Uninstalling netfetch
+
+If you want to uninstall the application - you can do so by running the following commands.
+
+```
+brew uninstall netfetch
+brew cleanup -s netfetch
+brew untap deggja/netfetch https://github.com/deggja/netfetch
+```
 
 ## Contribute 🔨
 You are welcome to contribute!
