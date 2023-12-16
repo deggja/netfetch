@@ -392,7 +392,7 @@
       this.lastScanType = 'cluster';
       this.suggestedNetworkPolicies = [];
       try {
-        const response = await axios.get('http://localhost:8080/scan');
+        const response = await axios.get('/scan');
         this.scanResults = response.data;
         this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
         this.netfetchScore = response.data.Score;
@@ -404,7 +404,7 @@
       },
       async fetchNamespacesWithPolicies() {
         try {
-          const response = await axios.get('http://localhost:8080/namespaces-with-policies');
+          const response = await axios.get('/namespaces-with-policies');
           return response.data.namespaces;
         } catch (error) {
           console.error('Error fetching namespaces with policies:', error);
@@ -435,7 +435,7 @@
       },
       async remediate(namespace) {
         try {
-          const response = await axios.post('http://localhost:8080/add-policy', { namespace });
+          const response = await axios.post('/add-policy', { namespace });
           if (response.status === 200) {
             this.showSuccessMessage(namespace);
             // Update the unprotectedPods list by removing the remediated namespace's pods.
@@ -557,7 +557,7 @@
     },
       async fetchExistingPolicies(namespace) {
         try {
-          const response = await axios.get(`http://localhost:8080/namespace-policies?namespace=${namespace}`);
+          const response = await axios.get(`/namespace-policies?namespace=${namespace}`);
           return response.data.items.map(policy => policy.metadata.name);
         } catch (error) {
           console.error('Error fetching existing policies:', error);
@@ -566,7 +566,7 @@
       },
       async fetchPodInfo(namespace) {
         try {
-          const response = await axios.get(`http://localhost:8080/pod-info?namespace=${namespace}`);
+          const response = await axios.get(`/pod-info?namespace=${namespace}`);
           // Check if the data is present and is an array, else return an empty array
           return Array.isArray(response.data) ? response.data : [];
         } catch (error) {
@@ -600,7 +600,7 @@
       async fetchAllNamespaces() {
         console.log('fetchAllNamespaces called');
         try {
-          const response = await axios.get('http://localhost:8080/namespaces');
+          const response = await axios.get('/namespaces');
           this.allNamespaces = response.data.namespaces;
           console.log('Namespaces fetched:', this.allNamespaces);
         } catch (error) {
@@ -623,7 +623,7 @@
         this.isLoadingVisualization = true;
 
         try {
-          const scanResponse = await axios.get(`http://localhost:8080/scan?namespace=${namespace}`);
+          const scanResponse = await axios.get(`/scan?namespace=${namespace}`);
           this.scanResults = scanResponse.data;
           if (scanResponse.data.UnprotectedPods && scanResponse.data.UnprotectedPods.length > 0) {
             this.unprotectedPods = this.parseUnprotectedPods(scanResponse.data.UnprotectedPods);
@@ -652,7 +652,7 @@
         }
         for (const namespace of namespaces) {
           try {
-            const response = await axios.get(`http://localhost:8080/visualization?namespace=${namespace}`);
+            const response = await axios.get(`/visualization?namespace=${namespace}`);
             if (response.data && Array.isArray(response.data.policies)) {
               this.namespaceVisualizationData[namespace] = response.data.policies;
             } else {
@@ -672,7 +672,7 @@
         this.clusterMapGenerationCount++;
 
         try {
-        const response = await axios.get('http://localhost:8080/visualization/cluster');
+          const response = await axios.get('/visualization/cluster');
         if (response.data && Array.isArray(response.data)) {
           this.clusterVisualizationData = response.data;
         } else {
@@ -690,7 +690,7 @@
       async fetchVisualizationData(namespace) {
         if (!namespace) return;
         try {
-          const response = await axios.get(`http://localhost:8080/visualization?namespace=${namespace}`);
+          const response = await axios.get(`/visualization?namespace=${namespace}`);
           if (response.data && Array.isArray(response.data.policies)) {
             // Your existing logic
           } else {
