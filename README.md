@@ -30,6 +30,7 @@ Dashboard:
 - Double click a network policy in a network map to preview the YAML of that policy.
 - Create implicit default deny network policies in namespaces that do not have one.
 - Get suggestions for network policies that you can edit & apply to your namespaces by analysing existing pods.
+- Get a score calculated for your cluster or namespace based on the findings of the scans.
 
 ## Installation via Homebrew for Mac 💻
 
