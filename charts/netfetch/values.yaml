@@ -37,6 +37,8 @@ ingress:
   className: ""
   annotations:
    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+   # kubernetes.io/tls-acme: "true"
+   # nginx.ingress.kubernetes.io/rewrite-target: /
   hosts:
     - host: netfetch.example.local  # Update this to reflect your domain
       paths:

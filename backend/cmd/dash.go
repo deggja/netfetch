@@ -49,11 +49,21 @@ func startDashboardServer() {
 		return
 	}
 
-	// Set up CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:8081"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Content-Type", "X-CSRF-Token"},
+		AllowOriginRequestFunc: func(r *http.Request, origin string) bool {
+			// Implement your dynamic origin check here
+			host := r.Host // Extract the host from the request
+			allowedOrigins := []string{"http://localhost:8081", "https://" + host}
+			for _, allowedOrigin := range allowedOrigins {
+				if origin == allowedOrigin {
+					return true
+				}
+			}
+			return false
+		},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "X-CSRF-Token"},
+		AllowCredentials: true,
 	})
 
 	// Set up handlers

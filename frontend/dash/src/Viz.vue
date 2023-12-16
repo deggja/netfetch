@@ -515,8 +515,8 @@
       },
       // Fetch policy yaml preview for viz
       fetchPolicyYAML(policyName, namespace) {
-        // Construct the URL with query parameters
-        const baseURL = 'http://localhost:8080';
+        // Use the current origin as the base URL
+        const baseURL = window.location.origin;
         const url = new URL('/policy-yaml', baseURL);
         url.searchParams.append('name', policyName);
         url.searchParams.append('namespace', namespace);
@@ -530,7 +530,7 @@
           .catch(error => {
             console.error("Failed to fetch policy YAML:", error);
           });
-      },
+    },
       displayYAML(yamlContent) {
       this.isYamlVisible = true;
 
