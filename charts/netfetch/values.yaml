@@ -34,19 +34,19 @@ service:
 
 ingress:
   enabled: false
-  className: ""
+  className: "nginx"
   annotations:
    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
    # kubernetes.io/tls-acme: "true"
    # nginx.ingress.kubernetes.io/rewrite-target: /
   hosts:
-    - host: netfetch.example.local  # Update this to reflect your domain
+    - host: netfetch.example.com  # Update this to reflect your domain
       paths:
         - path: /
           pathType: ImplementationSpecific
   tls:
     - hosts:
-        - myapp.example.com
+        - netfetch.example.com
       secretName: netfetch-tls
 
 resources: {}
