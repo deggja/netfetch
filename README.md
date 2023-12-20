@@ -1,14 +1,14 @@
 ![image](https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7)
 
 ## Contents
-- [What is this project?](#⭐-what-is-this-project-⭐)
-  - [Install with brew](#installation-via-homebrew-for-mac-💻)
-  - [Install in Kubernetes](#installation-via-helm-🎩)
+- [What is this project?](#-what-is-this-project-)
+  - [Install with brew](#installation-via-homebrew-for-mac-)
+  - [Install in Kubernetes](#installation-via-helm-)
   - [How to use](#usage)
-  - [Dashboard](#using-the-dashboard-📟)
-  - [Score](#netfetch-score)
+  - [Dashboard](#using-the-dashboard-)
+  - [Score](#netfetch-score-)
   - [Uninstalling](#uninstalling-netfetch)
-- [Contribute](#contribute-🔨)
+- [Contribute](#contribute-)
 
 ## ⭐ What is this project ⭐
 
