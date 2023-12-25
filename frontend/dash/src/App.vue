@@ -339,6 +339,15 @@
           if (response.status === 200) {
             this.creationMessage = 'Policy created successfully!';
             this.creationError = '';
+
+            // Reset visualization data for all other namespaces
+            Object.keys(this.namespaceVisualizationData).forEach(ns => {
+              if (ns !== namespace) {
+                // Assuming the default state for no visualization data is an empty array or null
+                this.namespaceVisualizationData[ns] = [];
+              }
+            });
+            
             // Refresh the suggested policies and visualization data for the namespace
             await this.suggestPolicy();
             await this.fetchVisualizationDataForNamespaces([namespace]);
