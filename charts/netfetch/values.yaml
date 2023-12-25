@@ -27,6 +27,8 @@ securityContext: {}
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
+  # allowPrivilegeEscalation: false
+  # privileged: false
 
 service:
   type: ClusterIP
