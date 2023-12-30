@@ -87,20 +87,23 @@
 
     // Group policies by namespace and prepare nodes and links
     data.forEach(policy => {
+      console.log(policy.targetPods);
       if (!namespaceClusterMap.has(policy.namespace)) {
         namespaceClusterMap.set(policy.namespace, policy.namespace);
       }
       const namespaceCluster = namespaceClusterMap.get(policy.namespace);
 
-      const policyNode = { id: policy.name, type: 'policy', cluster: namespaceCluster };
+      const policyNodeId = `${policy.namespace}-${policy.name}`;
+      const policyNode = { id: policyNodeId, type: 'policy', cluster: namespaceCluster, namespace: policy.namespace };
       nodes.push(policyNode);
 
       policy.targetPods.forEach(podName => {
-        const podNode = { id: podName, type: 'pod', cluster: namespaceCluster };
-        if (!nodes.some(n => n.id === podName)) {
+        const podNodeId = `${policy.namespace}-${podName}`;
+        const podNode = { id: podNodeId, type: 'pod', cluster: namespaceCluster, namespace: policy.namespace };
+        if (!nodes.some(n => n.id === podNodeId)) {
           nodes.push(podNode);
         }
-        links.push({ source: policy.name, target: podName });
+        links.push({ source: policyNodeId, target: podNodeId });
       });
     });
 
@@ -394,24 +397,26 @@
 
     // Add labels with hover functionality to show full text
     const labels = containerGroup.append('g')
-        .attr('class', 'labels')
-        .selectAll('text')
-        .data(nodes)
-        .enter().append('text')
-        .attr('dx', 12)
-        .attr('dy', '.35em')
-        .text(d => {
-            // Display full name for policy and truncate for pod
-            return d.type === 'policy' ? d.id : (d.id.substring(0, 10) + (d.id.length > 10 ? '...' : ''));
-        })
-        .on('mouseover', (event, d) => {
-            tooltip.html(d.id)
-                .style('visibility', 'visible')
-                .style('left', (event.pageX + 10) + 'px')
-                .style('top', (event.pageY - 10) + 'px');
-        })
+      .attr('class', 'labels')
+      .selectAll('text')
+      .data(nodes)
+      .enter().append('text')
+      .attr('dx', 12)
+      .attr('dy', '.35em')
+      .text(d => {
+      // Remove the entire namespace prefix from the ID for display
+      const nameWithoutNamespace = d.id.replace(`${d.namespace}-`, '');
+      return d.type === 'policy' ? nameWithoutNamespace : (nameWithoutNamespace.substring(0, 10) + (nameWithoutNamespace.length > 10 ? '...' : ''));
+      })
+      .on('mouseover', (event, d) => {
+        // Same here for the tooltip
+        tooltip.html(d.id.replace(`${d.namespace}-`, ''))
+          .style('visibility', 'visible')
+          .style('left', (event.pageX + 10) + 'px')
+          .style('top', (event.pageY - 10) + 'px');
+      })
         .on('mouseout', () => {
-            tooltip.style('visibility', 'hidden');
+          tooltip.style('visibility', 'hidden');
         });
 
         simulation.on('tick', () => {
@@ -514,7 +519,10 @@
         this.yamlDisplayGroup.call(drag(simulation));
       },
       // Fetch policy yaml preview for viz
-      fetchPolicyYAML(policyName, namespace) {
+      fetchPolicyYAML(policyId, namespace) {
+        // Extract the actual policy name by removing the namespace prefix
+        const policyName = policyId.replace(`${namespace}-`, '');
+        
         // Use the current origin as the base URL
         const baseURL = window.location.origin;
         const url = new URL('/policy-yaml', baseURL);
@@ -530,7 +538,7 @@
           .catch(error => {
             console.error("Failed to fetch policy YAML:", error);
           });
-    },
+      },
       displayYAML(yamlContent) {
       this.isYamlVisible = true;
 
