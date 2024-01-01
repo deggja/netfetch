@@ -54,6 +54,25 @@
           <button @click="generateClusterNetworkMap" class="scan-btn create-cluster-map-btn">Create cluster map</button>
         </div>
 
+        <!-- Checkbox for selecting "native" network policy type -->
+        <div class="policy-type-checkboxes">
+          <label class="checkbox-container">
+            k8s native
+            <input type="checkbox" v-model="isScanForNative">
+            <span class="checkmark"></span>
+          </label>
+          <label class="checkbox-container">
+            cilium
+            <input type="checkbox" v-model="isScanForCilium">
+            <span class="checkmark"></span>
+          </label>
+          <label class="checkbox-container">
+            calico
+            <input type="checkbox" v-model="isScanForCalico">
+            <span class="checkmark"></span>
+          </label>
+        </div>
+
         <div class="message-container">
           <!-- Success or Error Message Display -->
           <div v-if="message" :class="{'notification success': message.type === 'success', 'error': message.type === 'notification error'}">
@@ -227,6 +246,7 @@
         creationError: '',
         isShowTooltip: false,
         activeNamespaceForPolicies: '',
+        isScanForNative: true,
         remediateTooltipText: 'Remediate will create a default deny all ingress and egress network policy in the namespace. This will deny all traffic coming to and from the pods. In addition to doing this, you must create network policies to allow the required traffic from and to your pods. You can do this by using the Suggest policy button.'
       };
     },
@@ -396,30 +416,32 @@
         this.menuVisible = !this.menuVisible;
       },
       async fetchScanResults() {
-      this.isShowClusterMap = false;
-      this.scanInitiated = true;
-      this.lastScanType = 'cluster';
-      this.suggestedNetworkPolicies = [];
-      try {
-        const response = await axios.get('/scan');
-        this.scanResults = response.data;
-        this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
-        this.netfetchScore = response.data.Score;
-        this.updateExpandedNamespaces();
-        this.namespaceVisualizationData = {};
-      } catch (error) {
-        console.error('Error fetching scan results:', error);
-        }
+        if (this.isScanForNative) {
+          this.isShowClusterMap = false;
+          this.scanInitiated = true;
+          this.lastScanType = 'cluster';
+          this.suggestedNetworkPolicies = [];
+          try {
+            const response = await axios.get('/scan');
+            this.scanResults = response.data;
+            this.unprotectedPods = this.parseUnprotectedPods(response.data.UnprotectedPods);
+            this.netfetchScore = response.data.Score;
+            this.updateExpandedNamespaces();
+            this.namespaceVisualizationData = {};
+          } catch (error) {
+            console.error('Error fetching scan results:', error);
+            }
+          }
+        },
+        async fetchNamespacesWithPolicies() {
+          try {
+            const response = await axios.get('/namespaces-with-policies');
+            return response.data.namespaces;
+          } catch (error) {
+            console.error('Error fetching namespaces with policies:', error);
+            return [];
+          }
       },
-      async fetchNamespacesWithPolicies() {
-        try {
-          const response = await axios.get('/namespaces-with-policies');
-          return response.data.namespaces;
-        } catch (error) {
-          console.error('Error fetching namespaces with policies:', error);
-          return [];
-        }
-    },
       updateExpandedNamespaces() {
       const namespaces = new Set(this.unprotectedPods.map(pod => pod.namespace));
       namespaces.forEach(namespace => {
@@ -617,39 +639,41 @@
         }
       },
       async fetchScanResultsForNamespace() {
-        this.suggestedNetworkPolicies = [];
-        const namespace = this.selectedNamespace;
-        if (!namespace) {
-          alert('Please select a namespace.');
-          return;
-        }
-
-        this.isShowClusterMap = false;
-        this.namespaceVisualizationData = {};
-        this.clusterVisualizationData = [];
-        this.lastScanType = 'namespace';
-        this.scanInitiated = true;
-        this.isLoadingVisualization = true;
-
-        try {
-          const scanResponse = await axios.get(`/scan?namespace=${namespace}`);
-          this.scanResults = scanResponse.data;
-          if (scanResponse.data.UnprotectedPods && scanResponse.data.UnprotectedPods.length > 0) {
-            this.unprotectedPods = this.parseUnprotectedPods(scanResponse.data.UnprotectedPods);
-            this.netfetchScore = scanResponse.data.Score || null;
-          } else {
-            this.unprotectedPods = [];
-            this.netfetchScore = 42;
+        if (this.isScanForNative) {
+          this.suggestedNetworkPolicies = [];
+          const namespace = this.selectedNamespace;
+          if (!namespace) {
+            alert('Please select a namespace.');
+            return;
           }
-          this.updateExpandedNamespaces();
 
-          // Fetch visualization data only for the scanned namespace
-          await this.fetchVisualizationDataForNamespaces([namespace]);
-        } catch (error) {
-          console.error('Error scanning namespace:', namespace, error);
-          this.message = { type: 'error', text: `Failed to scan namespace: ${namespace}. Error: ${error.message}` };
-        } finally {
-          this.isLoadingVisualization = false;
+          this.isShowClusterMap = false;
+          this.namespaceVisualizationData = {};
+          this.clusterVisualizationData = [];
+          this.lastScanType = 'namespace';
+          this.scanInitiated = true;
+          this.isLoadingVisualization = true;
+
+          try {
+            const scanResponse = await axios.get(`/scan?namespace=${namespace}`);
+            this.scanResults = scanResponse.data;
+            if (scanResponse.data.UnprotectedPods && scanResponse.data.UnprotectedPods.length > 0) {
+              this.unprotectedPods = this.parseUnprotectedPods(scanResponse.data.UnprotectedPods);
+              this.netfetchScore = scanResponse.data.Score || null;
+            } else {
+              this.unprotectedPods = [];
+              this.netfetchScore = 42;
+            }
+            this.updateExpandedNamespaces();
+
+            // Fetch visualization data only for the scanned namespace
+            await this.fetchVisualizationDataForNamespaces([namespace]);
+          } catch (error) {
+            console.error('Error scanning namespace:', namespace, error);
+            this.message = { type: 'error', text: `Failed to scan namespace: ${namespace}. Error: ${error.message}` };
+          } finally {
+            this.isLoadingVisualization = false;
+          }
         }
       },
       // Fetch and update visualization data for multiple namespaces
@@ -1131,6 +1155,81 @@
     align-items: center;
     justify-content: center;
   }
+
+  .checkbox-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-left: 25px;
+  margin-top: 5px;
+  margin-bottom: 0;
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.policy-type-checkboxes {
+  display: flex;
+  justify-content: flex-start;
+  gap: 2.5px;
+}
+
+.checkbox-container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  height: 18px;
+  width: 18px;
+  background-color: #eee;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.checkbox-container:hover input ~ .checkmark {
+  background-color: #ccc;
+}
+
+.checkbox-container input:checked ~ .checkmark {
+  background-color: #2196F3;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.checkbox-container .checkmark:after {
+  left: 6px;
+  top: 3px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  -webkit-transform: rotate(45deg);
+  -ms-transform: rotate(45deg);
+  transform: rotate(45deg);
+}
+
+.checkbox-container:not(:last-child) {
+  margin-right: 10px;
+}
 
   /* Dark Mode Specific Styles */
   .dark-mode-toggle-container {

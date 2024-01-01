@@ -92,7 +92,7 @@ func startDashboardServer() {
 
 // func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 // 	// Check if we are in development mode
-// 	isDevelopment := true // You can use an environment variable or a config flag to set this
+// 	isDevelopment := true
 // 	if isDevelopment {
 // 		// Redirect to the Vue dev server
 // 		vueDevServer := "http://localhost:8081"
