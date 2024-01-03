@@ -63,6 +63,8 @@ func isNetworkError(err error) bool {
 	return false
 }
 
+var hasStartedNativeScan bool = false
+
 // ScanNetworkPolicies scans namespaces for network policies
 func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult bool, isCLI bool, printScore bool, printMessages bool) (*ScanResult, error) {
 	var output bytes.Buffer
@@ -99,7 +101,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 			return nil, err
 		}
 		for _, ns := range allNamespaces.Items {
-			if !isSystemNamespace(ns.Name) {
+			if !IsSystemNamespace(ns.Name) {
 				namespacesToScan = append(namespacesToScan, ns.Name)
 			}
 		}
@@ -108,8 +110,12 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 	missingPoliciesOrUncoveredPods := false
 	userDeniedPolicyApplication := false
 	policyChangesMade := false
-
 	deniedNamespaces := []string{}
+
+	if isCLI && !hasStartedNativeScan {
+		fmt.Println("Policy type: Kubernetes native")
+		hasStartedNativeScan = true
+	}
 
 	for _, nsName := range namespacesToScan {
 		policies, err := clientset.NetworkingV1().NetworkPolicies(nsName).List(context.TODO(), metav1.ListOptions{})
@@ -172,7 +178,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 				}
 			}
 
-			if isCLI {
+			if !hasDenyAll && len(unprotectedPodDetails) > 0 && isCLI {
 				if len(unprotectedPodDetails) > 0 {
 					printToBoth(writer, "\nUnprotected Pods found in namespace "+nsName+":\n")
 					for _, detail := range unprotectedPodDetails {
@@ -208,6 +214,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 					scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
 				}
 			}
+
 		}
 	}
 
@@ -232,9 +239,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 		}
 	}
 
-	score := calculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
-
-	// Update the score in scanResult
+	score := CalculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
 	scanResult.Score = score
 
 	if printMessages {
@@ -262,6 +267,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 		fmt.Printf("\nYour Netfetch security score is: %d/42\n", score)
 	}
 
+	hasStartedNativeScan = false
 	return scanResult, nil
 }
 
@@ -310,7 +316,7 @@ func isDefaultDenyAllPolicy(policy networkingv1.NetworkPolicy) bool {
 }
 
 // isSystemNamespace checks if the given namespace is a system namespace
-func isSystemNamespace(namespace string) bool {
+func IsSystemNamespace(namespace string) bool {
 	switch namespace {
 	case "kube-system", "tigera-operator", "kube-public", "kube-node-lease", "gatekeeper-system", "calico-system":
 		return true
@@ -320,7 +326,7 @@ func isSystemNamespace(namespace string) bool {
 }
 
 // Scoring logic
-func calculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int) int {
+func CalculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int) int {
 	score := 42 // Start with the highest score
 
 	if !hasPolicies {
@@ -379,7 +385,7 @@ func HandleNamespaceListRequest(w http.ResponseWriter, r *http.Request) {
 
 	var namespaceList []string
 	for _, ns := range namespaces.Items {
-		if !isSystemNamespace(ns.Name) {
+		if !IsSystemNamespace(ns.Name) {
 			namespaceList = append(namespaceList, ns.Name)
 		}
 	}

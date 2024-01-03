@@ -1,0 +1,17 @@
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: upbound-provider-family-azure-policy
+  namespace: crossplane-system
+spec:
+  endpointSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: provider-family-azure
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        pkg.crossplane.io/revision: upbound-provider-family-azure-637b77277dbe
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        pkg.crossplane.io/revision: upbound-provider-family-azure-637b77277dbe
