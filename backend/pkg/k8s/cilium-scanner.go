@@ -323,7 +323,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	// Report the detected policies
 	if isCLI {
-		printToBoth(writer, "Detected Cilium Clusterwide Network Policies:\n")
+		printToBoth(writer, "Found:\n")
 		for _, policy := range policies.Items {
 			policyName, _, _ := unstructured.NestedString(policy.UnstructuredContent(), "metadata", "name")
 			printToBoth(writer, "- "+policyName+"\n")
@@ -337,6 +337,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		UnprotectedPods:    []string{},
 		PolicyChangesMade:  false,
 		UserDeniedPolicies: false,
+		AllPodsProtected:   false,
 		HasDenyAll:         []string{},
 		Score:              0, // or some initial value
 	}
@@ -354,6 +355,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 			defaultDenyAllFound = true
 			if isClusterWide {
 				appliesToEntireCluster = true
+				scanResult.AllPodsProtected = true
 			} else {
 				// Track policies that are default deny but don't apply to the entire cluster
 				partialDenyAllFound = true
@@ -377,7 +379,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		printToBoth(writer, "No cluster-wide default deny all policy detected.\n")
 		createPolicy := false
 		prompt := &survey.Confirm{
-			Message: "Do you want to create a cluster-wide default deny all Cilium network policy?",
+			Message: "Do you want to create a cluster wide default deny all cilium network policy?",
 		}
 		survey.AskOne(prompt, &createPolicy, nil)
 
@@ -386,7 +388,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 			if err != nil {
 				printToBoth(writer, fmt.Sprintf("\nFailed to apply default deny Cilium clusterwide policy: %s\n", err))
 			} else {
-				printToBoth(writer, "\nApplied default deny Cilium clusterwide policy\n")
+				printToBoth(writer, "\nApplied cluster wide default deny cilium policy\n")
 				scanResult.PolicyChangesMade = true
 			}
 		} else {
@@ -413,7 +415,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	if len(scanResult.UnprotectedPods) > 0 {
 		printToBoth(writer, fmt.Sprintf("Found %d unprotected pods.\n", len(scanResult.UnprotectedPods)))
 	} else {
-		printToBoth(writer, "All pods are protected by cluster-wide policies.\n")
+		printToBoth(writer, "All pods are protected by cluster wide policies.\n")
 	}
 
 	if printMessages {
