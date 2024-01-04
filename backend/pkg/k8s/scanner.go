@@ -43,6 +43,7 @@ type ScanResult struct {
 	UserDeniedPolicies bool
 	HasDenyAll         []string
 	Score              int
+	AllPodsProtected   bool
 }
 
 // Check if error scanning is related to network issues
