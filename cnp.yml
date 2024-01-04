@@ -15,3 +15,63 @@ spec:
   - toEndpoints:
     - matchLabels:
         pkg.crossplane.io/revision: upbound-provider-family-azure-637b77277dbe
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: "clusterwide-policy-example"
+spec:
+  description: "Policy for selective ingress allow to a pod from only a pod with given label"
+  endpointSelector:
+    matchLabels:
+      name: leia
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        name: luke
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: "wildcard-from-endpoints"
+spec:
+  description: "Policy for ingress allow to kube-dns from all Cilium managed endpoints in the cluster"
+  endpointSelector:
+    matchLabels:
+      k8s:io.kubernetes.pod.namespace: kube-system
+      k8s-app: kube-dns
+  ingress:
+  - fromEndpoints:
+    - {}
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: "cilium-health-checks"
+spec:
+  endpointSelector:
+    matchLabels:
+      'reserved:health': ''
+  ingress:
+    - fromEntities:
+      - remote-node
+  egress:
+    - toEntities:
+      - remote-node
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: "default-deny-selected-namespaces"
+spec:
+  endpointSelector:
+    matchLabels:
+      io.cilium.k8s.namespace.labels.enforce-deny-all: "true"
+  ingress:
+  - {}  # An empty ingress rule denies all ingress traffic.
+  egress:
+  - {}  # An empty egress rule denies all egress traffic
