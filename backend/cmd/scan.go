@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	dryRun bool
-	native bool
-	cilium bool
+	dryRun      bool
+	native      bool
+	cilium      bool
+	clusterwide bool
 )
 
 var scanCmd = &cobra.Command{
@@ -24,6 +25,22 @@ var scanCmd = &cobra.Command{
 		var namespace string
 		if len(args) > 0 {
 			namespace = args[0]
+		}
+
+		// If clusterwide is specified, only perform cluster-wide Cilium scan
+		if clusterwide {
+			dynamicClient, err := k8s.GetCiliumDynamicClient()
+			if err != nil {
+				fmt.Println("Error obtaining dynamic client:", err)
+				return
+			}
+			clusterwideScanResult, err := k8s.ScanCiliumClusterwideNetworkPolicies(dynamicClient, true, true)
+			if err != nil {
+				fmt.Println("Error during cluster wide Cilium network policies scan:", err)
+			} else {
+				handleScanResult(clusterwideScanResult)
+			}
+			return // Exit after completing clusterwide scan
 		}
 
 		// Perform Kubernetes native network policy scan if no specific type is mentioned or if --native is used
@@ -45,7 +62,6 @@ var scanCmd = &cobra.Command{
 				fmt.Println("Error during cilium network policies scan:", err)
 			} else {
 				fmt.Println("Cilium network policies scan completed successfully.")
-				// Do something with ciliumScanResult like logging or aggregating data
 				handleScanResult(ciliumScanResult)
 			}
 		}
@@ -60,5 +76,6 @@ func init() {
 	scanCmd.Flags().BoolVarP(&dryRun, "dryrun", "d", false, "Perform a dry run without applying any changes")
 	scanCmd.Flags().BoolVar(&native, "native", false, "Scan only native network policies")
 	scanCmd.Flags().BoolVar(&cilium, "cilium", false, "Scan only Cilium network policies")
+	scanCmd.Flags().BoolVar(&clusterwide, "clusterwide", false, "Scan cluster wide Cilium network policies")
 	rootCmd.AddCommand(scanCmd)
 }
