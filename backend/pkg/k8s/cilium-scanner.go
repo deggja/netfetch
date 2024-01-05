@@ -43,11 +43,17 @@ func GetCiliumDynamicClient() (dynamic.Interface, error) {
 }
 
 var hasStartedCiliumScan bool = false
+var globallyProtectedPods = make(map[string]struct{})
 
 // ScanCiliumNetworkPolicies scans namespaces for Cilium network policies
 func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResult bool, isCLI bool, printScore bool, printMessages bool) (*ScanResult, error) {
 	var output bytes.Buffer
 	var namespacesToScan []string
+
+	fmt.Println("Globally protected pods before namespaced scan:")
+	for podIdentifier := range globallyProtectedPods {
+		fmt.Println(" -", podIdentifier)
+	}
 
 	unprotectedPodsCount := 0
 	scanResult := new(ScanResult)
@@ -180,10 +186,19 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 			}
 
 			for _, pod := range allPods.Items {
-				if !coveredPods[pod.Name] {
-					podDetail := fmt.Sprintf("%s %s %s", nsName, pod.Name, pod.Status.PodIP)
-					unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
-					unprotectedPodsCount++
+				podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name) // Create a unique identifier for the pod
+
+				// Check if the pod is globally protected. If it is, skip it.
+				if _, protectedGlobally := globallyProtectedPods[podIdentifier]; !protectedGlobally {
+					// Check if the pod is protected by the policies. If it's protected, it'll also be added to globallyProtectedPods
+					if isPodProtected(pod, unstructuredPolicies, hasDenyAll, globallyProtectedPods) {
+						fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
+					} else {
+						// Handle unprotected pod
+						podDetail := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
+						unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
+						unprotectedPodsCount++
+					}
 				}
 			}
 
@@ -309,11 +324,18 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		Resource: "ciliumclusterwidenetworkpolicies",
 	}
 
+	var unstructuredPolicies []*unstructured.Unstructured
+
 	// Fetch the policies from the cluster
 	policies, err := dynamicClient.Resource(ciliumCCNPResource).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		printToBoth(writer, fmt.Sprintf("Error listing CiliumClusterwideNetworkPolicies: %s\n", err))
 		return nil, fmt.Errorf("error listing CiliumClusterwideNetworkPolicies: %v", err)
+	}
+
+	// After fetching policies, populate unstructuredPolicies
+	for _, policy := range policies.Items {
+		unstructuredPolicies = append(unstructuredPolicies, &policy)
 	}
 
 	if isCLI && !hasStartedCiliumScan {
@@ -323,10 +345,15 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	// Report the detected policies
 	if isCLI {
-		printToBoth(writer, "Found:\n")
-		for _, policy := range policies.Items {
-			policyName, _, _ := unstructured.NestedString(policy.UnstructuredContent(), "metadata", "name")
-			printToBoth(writer, "- "+policyName+"\n")
+		if len(policies.Items) == 0 {
+			printToBoth(writer, "No policies found.\n")
+		} else {
+			// Report the detected policies
+			printToBoth(writer, "Found:\n")
+			for _, policy := range policies.Items {
+				policyName, _, _ := unstructured.NestedString(policy.UnstructuredContent(), "metadata", "name")
+				printToBoth(writer, "- "+policyName+"\n")
+			}
 		}
 	}
 
@@ -345,8 +372,6 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	// Initialize variables to track policies
 	var defaultDenyAllFound, appliesToEntireCluster, partialDenyAllFound bool
 	var partialDenyAllPolicies []string // To hold names of policies that don't apply to the entire cluster
-
-	var unstructuredPolicies []*unstructured.Unstructured
 
 	// Iterate through each policy to determine its type
 	for _, policy := range policies.Items {
@@ -369,7 +394,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	if appliesToEntireCluster {
 		printToBoth(writer, "Cluster wide default deny all policy detected.\n")
 	} else if defaultDenyAllFound && partialDenyAllFound {
-		printToBoth(writer, "Default deny policy detected, but it does not apply to the entire cluster. Partial policies: ")
+		printToBoth(writer, "Policy detected, but it does not apply to the entire cluster. Partial policies: ")
 		for _, pName := range partialDenyAllPolicies {
 			printToBoth(writer, pName+" ")
 		}
@@ -406,7 +431,11 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	// Check each pod to see if it's protected by the policies
 	for _, pod := range pods.Items {
-		if !isPodProtected(pod, unstructuredPolicies, defaultDenyAllExists) {
+		if isPodProtected(pod, unstructuredPolicies, defaultDenyAllExists, globallyProtectedPods) {
+			podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+			fmt.Printf("Marking pod %s/%s as globally protected\n", pod.Namespace, pod.Name)
+			globallyProtectedPods[podIdentifier] = struct{}{}
+		} else {
 			unprotectedPods := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 			scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPods)
 		}
@@ -420,6 +449,11 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	if printMessages {
 		printToBoth(writer, "\nCluster wide cilium network policy scan completed!\n")
+	}
+
+	fmt.Println("Globally protected pods after cluster-wide scan:")
+	for podIdentifier := range globallyProtectedPods {
+		fmt.Println(" -", podIdentifier)
 	}
 
 	writer.Flush()
@@ -446,124 +480,90 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	return scanResult, nil
 }
 
-func isPodProtected(pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool) bool {
+func isPodProtected(pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
+	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+
+	// Log when checking protection for the pod
+	fmt.Printf("Checking protection for pod: %s/%s\n", pod.Namespace, pod.Name)
+
+	if _, protected := globallyProtectedPods[podIdentifier]; protected {
+		fmt.Printf("Pod %s/%s is globally protected\n", pod.Namespace, pod.Name)
+		return true
+	}
+
 	if defaultDenyAllExists {
+		// If defaultDenyAllExists, mark the pod as protected globally and return true
+		globallyProtectedPods[podIdentifier] = struct{}{}
 		return true
 	}
 
 	for _, policy := range policies {
-		fmt.Printf("Checking policy: %v\n", policy)
+		fmt.Printf("Evaluating policy %s for pod %s/%s\n", policy.GetName(), pod.Namespace, pod.Name)
 		spec, found := policy.UnstructuredContent()["spec"].(map[string]interface{})
 		if !found {
-			fmt.Println("No spec found in policy, skipping")
 			continue
 		}
 
 		endpointSelector, _, _ := unstructured.NestedMap(spec, "endpointSelector", "matchLabels")
-		fmt.Printf("Endpoint Selector: %v\n", endpointSelector)
-
 		isDenyAll, appliesToEntireCluster := isDefaultDenyAllCiliumClusterwidePolicy(*policy)
 
-		if isDenyAll {
-			if appliesToEntireCluster || (len(endpointSelector) == 0 && matchesLabels(pod.Labels, endpointSelector)) {
-				fmt.Println("Pod is protected by a default deny-all policy.")
+		// Debugging: Check if the policy is a cluster-wide deny-all
+		if isDenyAll && appliesToEntireCluster {
+			// Mark the pod as protected globally and return true
+			globallyProtectedPods[podIdentifier] = struct{}{}
+			return true
+		}
+
+		if matchesLabels(pod.Labels, endpointSelector) {
+			ingress, foundIngress, _ := unstructured.NestedSlice(spec, "ingress")
+			egress, foundEgress, _ := unstructured.NestedSlice(spec, "egress")
+
+			if (foundIngress && (isEmptyOrOnlyContainsEmptyObjects(ingress) || isSpecificallyEmpty(ingress))) || (foundEgress && (isEmptyOrOnlyContainsEmptyObjects(egress) || isSpecificallyEmpty(egress))) || isDenyAll {
+				fmt.Printf("Pod %s/%s is covered by policy: %s\n", pod.Namespace, pod.Name, policy.GetName())
+				// Mark the pod as protected globally and return true
+				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 		}
-
-		// Check if the endpointSelector matches the pod's labels
-		if matchesLabels(pod.Labels, endpointSelector) {
-			ingress, found, err := unstructured.NestedSlice(spec, "ingress")
-			if err != nil || !found {
-				fmt.Printf("Error or no ingress rules found in policy: %v\n", err)
-				continue
-			}
-
-			for _, rule := range ingress {
-				ruleMap, ok := rule.(map[string]interface{})
-				if !ok {
-					fmt.Println("Ingress rule is not a map, skipping")
-					continue
-				}
-
-				// Check for fromEndpoints
-				if fromEndpoints, found := ruleMap["fromEndpoints"]; found {
-					for _, endpoint := range fromEndpoints.([]interface{}) {
-						endpointMap := endpoint.(map[string]interface{})
-						// If fromEndpoints is empty, it's a wildcard allowing all
-						if len(endpointMap) == 0 {
-							return true
-						}
-						// Check if the pod's labels match the fromEndpoints selector
-						if matchesLabels(pod.Labels, endpointMap) {
-							return true
-						}
-					}
-				}
-
-				// Handle toPorts
-				if toPorts, found := ruleMap["toPorts"]; found {
-					for _, portRule := range toPorts.([]interface{}) {
-						portRuleMap := portRule.(map[string]interface{})
-						ports, found := portRuleMap["ports"].([]interface{})
-						if !found {
-							fmt.Println("No ports found in toPorts rule, skipping")
-							continue
-						}
-						// You might want to check against the pod's ports here
-						// For simplicity, let's assume if there's a toPort rule, the pod is protected
-						if len(ports) > 0 {
-							return true
-						}
-					}
-				}
-
-				// Handle fromEntities
-				if fromEntities, found := ruleMap["fromEntities"]; found {
-					for _, entity := range fromEntities.([]interface{}) {
-						// If fromEntities has "all" or the specific entity your pod represents, it's protected
-						if entity == "all" || entityMatchesPod(entity.(string), pod) {
-							return true
-						}
-					}
-				}
-			}
-
-			// Add logic here if there are other aspects of the policy to check
-			// For example, egress rules, toEntities, etc.
-		}
 	}
 
+	// Return false if no policy protects the pod
 	return false
 }
 
-func entityMatchesPod(entity string, pod corev1.Pod) bool {
-	switch entity {
-	case "all":
-		// All always matches any pod
-		return true
-	case "world":
-		// Determine if the pod communicates with entities outside the cluster
-		// This might involve checking the pod's networking configuration, labels, or annotations
-		// Placeholder logic: return false for now
-		return false
-	case "host":
-		// Check if the pod is using host networking
-		if pod.Spec.HostNetwork {
-			return true
-		}
-		return false
-	case "remote-node":
-		// Check if the pod is intended to communicate with a remote node
-		// This might involve checking node labels, pod's node affinity, or annotations
-		// Placeholder logic: return false for now
-		return false
-	default:
-		// Unknown entity type, log it, handle as needed
-		fmt.Printf("Unknown entity type encountered: %s\n", entity)
-		return false
-	}
+// Check specifically for a slice that only contains a single empty map ({}), representing a default deny.
+func isSpecificallyEmpty(slice []interface{}) bool {
+	return len(slice) == 1 && len(slice[0].(map[string]interface{})) == 0
 }
+
+// // Placeholder function for future reference
+// func entityMatchesPod(entity string, pod corev1.Pod) bool {
+// 	switch entity {
+// 	case "all":
+// 		// All always matches any pod
+// 		return true
+// 	case "world":
+// 		// Determine if the pod communicates with entities outside the cluster
+// 		// This might involve checking the pod's networking configuration, labels, or annotations
+// 		// Placeholder logic: return false for now
+// 		return false
+// 	case "host":
+// 		// Check if the pod is using host networking
+// 		if pod.Spec.HostNetwork {
+// 			return true
+// 		}
+// 		return false
+// 	case "remote-node":
+// 		// Check if the pod is intended to communicate with a remote node
+// 		// This might involve checking node labels, pod's node affinity, or annotations
+// 		// Placeholder logic: return false for now
+// 		return false
+// 	default:
+// 		// Unknown entity type, log it, handle as needed
+// 		fmt.Printf("Unknown entity type encountered: %s\n", entity)
+// 		return false
+// 	}
+// }
 
 // matchesLabels checks if the pod's labels match the policy's endpointSelector
 func matchesLabels(podLabels map[string]string, policySelector map[string]interface{}) bool {
