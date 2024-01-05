@@ -11,3 +11,16 @@ spec:
   - {}  # Empty ingress means no traffic is allowed in.
   egress:
   - {}  # Empty egress means no traffic is allowed out.
+---
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: grafana-network-policy
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  ingress:
+  - {}
+  egress:
+  - {}
