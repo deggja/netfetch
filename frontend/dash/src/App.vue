@@ -57,18 +57,18 @@
         <!-- Checkbox for selecting "native" network policy type -->
         <div class="policy-type-checkboxes">
           <label class="checkbox-container">
-            k8s native
-            <input type="checkbox" v-model="isScanForNative">
+            kubernetes
+            <input type="checkbox" v-model="isScanForNative" checked disabled>
             <span class="checkmark"></span>
           </label>
           <label class="checkbox-container">
             cilium
-            <input type="checkbox" v-model="isScanForCilium">
+            <input type="checkbox" v-model="isScanForCilium" disabled>
             <span class="checkmark"></span>
           </label>
           <label class="checkbox-container">
             calico
-            <input type="checkbox" v-model="isScanForCalico">
+            <input type="checkbox" v-model="isScanForCalico" disabled>
             <span class="checkmark"></span>
           </label>
         </div>
