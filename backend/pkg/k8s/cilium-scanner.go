@@ -324,8 +324,6 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		Resource: "ciliumclusterwidenetworkpolicies",
 	}
 
-	var unstructuredPolicies []*unstructured.Unstructured
-
 	// Fetch the policies from the cluster
 	policies, err := dynamicClient.Resource(ciliumCCNPResource).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
@@ -333,9 +331,30 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		return nil, fmt.Errorf("error listing CiliumClusterwideNetworkPolicies: %v", err)
 	}
 
-	// After fetching policies, populate unstructuredPolicies
-	for _, policy := range policies.Items {
-		unstructuredPolicies = append(unstructuredPolicies, &policy)
+	// Deduplicate policies by storing them in a map to check for uniqueness
+	policyMap := make(map[string]bool)
+	var unstructuredPolicies []*unstructured.Unstructured
+
+	for i := range policies.Items {
+		policy := policies.Items[i]
+		policyName := policy.GetName() // or use a more unique identifier if available
+
+		// Check if the policy has already been added to the map (and thus the list)
+		if _, exists := policyMap[policyName]; !exists {
+			// If it doesn't exist, add it to the map and the list
+			policyMap[policyName] = true
+			unstructuredPolicies = append(unstructuredPolicies, &policies.Items[i]) // Reference directly from the original slice
+		}
+	}
+
+	// Debug print: Check deduplicated policies
+	for _, policy := range unstructuredPolicies {
+		fmt.Printf("Policy after deduplication: %s\n", policy.GetName())
+	}
+
+	fmt.Println("Policies fetched from the cluster:")
+	for i, policy := range policies.Items {
+		fmt.Printf("Policy %d: %s\n", i+1, policy.GetName())
 	}
 
 	if isCLI && !hasStartedCiliumScan {
@@ -431,6 +450,11 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	// Check each pod to see if it's protected by the policies
 	for _, pod := range pods.Items {
+		// Debugging: Print the policies being passed to isPodProtected
+		for _, policy := range unstructuredPolicies {
+			fmt.Printf("Policy to be evaluated: %s\n", policy.GetName())
+		}
+
 		if isPodProtected(pod, unstructuredPolicies, defaultDenyAllExists, globallyProtectedPods) {
 			podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 			fmt.Printf("Marking pod %s/%s as globally protected\n", pod.Namespace, pod.Name)
@@ -482,10 +506,6 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 func isPodProtected(pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
 	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
-
-	// Log when checking protection for the pod
-	fmt.Printf("Checking protection for pod: %s/%s\n", pod.Namespace, pod.Name)
-
 	if _, protected := globallyProtectedPods[podIdentifier]; protected {
 		fmt.Printf("Pod %s/%s is globally protected\n", pod.Namespace, pod.Name)
 		return true
