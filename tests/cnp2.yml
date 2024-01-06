@@ -1,0 +1,26 @@
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: deny-crossplane-provider-kubernetes
+spec:
+  endpointSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: provider-kubernetes
+      pkg.crossplane.io/revision: provider-kubernetes-fd7ab5be249e
+  ingress:
+  - {}  # Empty ingress means no traffic is allowed in.
+  egress:
+  - {}  # Empty egress means no traffic is allowed out.
+---
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: grafana-network-policy
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  ingress:
+  - {}
+  egress:
+  - {}
