@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	dryRun bool
-	native bool
-	cilium bool
+	dryRun  bool
+	native  bool
+	cilium  bool
+	verbose bool
 )
 
 var scanCmd = &cobra.Command{
@@ -49,13 +50,13 @@ var scanCmd = &cobra.Command{
 					return
 				}
 
-				clusterwideScanResult, err := k8s.ScanCiliumClusterwideNetworkPolicies(dynamicClient, true, true)
+				clusterwideScanResult, err := k8s.ScanCiliumClusterwideNetworkPolicies(dynamicClient, false, dryRun, true)
 				if err != nil {
 					fmt.Println("Error during cluster-wide Cilium network policies scan:", err)
 				} else {
 					// Handle the cluster-wide scan result; skip further scanning if all pods are protected
 					if clusterwideScanResult.AllPodsProtected {
-						fmt.Println("All pods are protected by cluster-wide Cilium policies. Skipping individual namespace scan.")
+						fmt.Println("All pods are protected by cluster wide cilium policies. Skipping individual namespace scan.")
 						return
 					}
 					handleScanResult(clusterwideScanResult)
@@ -83,5 +84,6 @@ func init() {
 	scanCmd.Flags().BoolVarP(&dryRun, "dryrun", "d", false, "Perform a dry run without applying any changes")
 	scanCmd.Flags().BoolVar(&native, "native", false, "Scan only native network policies")
 	scanCmd.Flags().BoolVar(&cilium, "cilium", false, "Scan only Cilium network policies (includes cluster-wide policies if no namespace is specified)")
+	scanCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 	rootCmd.AddCommand(scanCmd)
 }
