@@ -188,7 +188,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				if _, protectedGlobally := globallyProtectedPods[podIdentifier]; !protectedGlobally {
 					// Check if the pod is protected by the policies. If it's protected, it'll also be added to globallyProtectedPods
 					if IsPodProtected(clientset, pod, unstructuredPolicies, hasDenyAll, globallyProtectedPods) {
-						fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
+						// [DEBUG] fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
 					} else {
 						// Handle unprotected pod
 						podDetail := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
@@ -488,42 +488,55 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 }
 
 func IsPodProtected(clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
+	var output bytes.Buffer
+	writer := bufio.NewWriter(&output)
+
 	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 	if _, protected := globallyProtectedPods[podIdentifier]; protected {
+		printToBoth(writer, fmt.Sprintf("Pod %s is already globally protected\n", podIdentifier))
 		return true
 	}
 
 	if defaultDenyAllExists {
+		printToBoth(writer, fmt.Sprintf("Default deny-all policy exists, marking pod %s as protected\n", podIdentifier))
 		globallyProtectedPods[podIdentifier] = struct{}{}
 		return true
 	}
 
 	// Loop through policies to find any that apply namespace-wide.
 	for _, policy := range policies {
+		policyName := policy.GetName()
+
 		spec, found := policy.UnstructuredContent()["spec"].(map[string]interface{})
 		if !found {
+			printToBoth(writer, fmt.Sprintf("No spec found in policy %s\n", policyName))
 			continue
 		}
 
 		endpointSelector, found, err := unstructured.NestedMap(spec, "endpointSelector", "matchLabels")
 		if err != nil {
-			fmt.Printf("Error reading endpointSelector from policy %s: %v\n", policy.GetName(), err)
+			printToBoth(writer, fmt.Sprintf("Error reading endpointSelector from policy %s: %v\n", policy.GetName(), err))
 			continue
 		}
 		if !found {
+			printToBoth(writer, fmt.Sprintf("No endpointSelector found in policy %s\n", policyName))
 			continue
 		}
 
 		// Check if the policy applies to the entire namespace.
 		if val, ok := endpointSelector["io.kubernetes.pod.namespace"]; ok && val == pod.Namespace {
+			printToBoth(writer, fmt.Sprintf("Pod %s is covered by cluster wide policy %s\n", podIdentifier, policyName))
 			globallyProtectedPods[podIdentifier] = struct{}{}
 			return true
 		}
 	}
 
 	for _, policy := range policies {
+		policyName := policy.GetName()
+
 		spec, found := policy.UnstructuredContent()["spec"].(map[string]interface{})
 		if !found {
+			printToBoth(writer, fmt.Sprintf("No spec found in policy %s\n", policyName))
 			continue
 		}
 
@@ -531,6 +544,7 @@ func IsPodProtected(clientset *kubernetes.Clientset, pod corev1.Pod, policies []
 		isDenyAll, appliesToEntireCluster := IsDefaultDenyAllCiliumClusterwidePolicy(*policy)
 
 		if isDenyAll && appliesToEntireCluster {
+			printToBoth(writer, fmt.Sprintf("Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
 			globallyProtectedPods[podIdentifier] = struct{}{}
 			return true
 		}
@@ -539,13 +553,23 @@ func IsPodProtected(clientset *kubernetes.Clientset, pod corev1.Pod, policies []
 			ingress, foundIngress, _ := unstructured.NestedSlice(spec, "ingress")
 			egress, foundEgress, _ := unstructured.NestedSlice(spec, "egress")
 
+			// Existing checks for empty ingress/egress and deny-all
 			if (foundIngress && (IsEmptyOrOnlyContainsEmptyObjects(ingress) || IsSpecificallyEmpty(ingress))) || (foundEgress && (IsEmptyOrOnlyContainsEmptyObjects(egress) || IsSpecificallyEmpty(egress))) || isDenyAll {
+				printToBoth(writer, fmt.Sprintf("Pod %s is protected by deny-all policy %s\n", podIdentifier, policyName))
+				globallyProtectedPods[podIdentifier] = struct{}{}
+				return true
+			}
+
+			// New check for specific ingress or egress rules
+			if foundIngress && !IsEmptyOrOnlyContainsEmptyObjects(ingress) || foundEgress && !IsEmptyOrOnlyContainsEmptyObjects(egress) {
+				printToBoth(writer, fmt.Sprintf("Pod %s is protected by policy %s with specific rules\n", podIdentifier, policyName))
 				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 		}
 	}
 
+	printToBoth(writer, fmt.Sprintf("Pod %s is not protected by any policy\n", podIdentifier))
 	return false
 }
 
@@ -614,7 +638,8 @@ func ConvertEndpointToSelector(endpointSelector map[string]interface{}) (string,
 		}
 	}
 
-	return strings.Join(selectorParts, ","), nil
+	labelSelector := strings.Join(selectorParts, ",")
+	return labelSelector, nil
 }
 
 // CreateAndApplyDefaultDenyCiliumClusterwidePolicy creates and applies a default deny all network policy for Cilium at the cluster level.
