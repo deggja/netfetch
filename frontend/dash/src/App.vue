@@ -58,12 +58,12 @@
         <div class="policy-type-checkboxes">
           <label class="checkbox-container">
             kubernetes
-            <input type="checkbox" v-model="isScanForNative" checked disabled>
+            <input type="checkbox" v-model="isScanForNative" @change="isScanForCilium = false" checked>
             <span class="checkmark"></span>
           </label>
           <label class="checkbox-container">
             cilium
-            <input type="checkbox" v-model="isScanForCilium" disabled>
+            <input type="checkbox" v-model="isScanForCilium" @change="isScanForNative = false">
             <span class="checkmark"></span>
           </label>
           <label class="checkbox-container">
@@ -247,6 +247,7 @@
         isShowTooltip: false,
         activeNamespaceForPolicies: '',
         isScanForNative: true,
+        isScanForCilium: false,
         remediateTooltipText: 'Remediate will create a default deny all ingress and egress network policy in the namespace. This will deny all traffic coming to and from the pods. In addition to doing this, you must create network policies to allow the required traffic from and to your pods. You can do this by using the Suggest policy button.'
       };
     },
@@ -639,43 +640,50 @@
         }
       },
       async fetchScanResultsForNamespace() {
-        if (this.isScanForNative) {
-          this.suggestedNetworkPolicies = [];
-          const namespace = this.selectedNamespace;
-          if (!namespace) {
-            alert('Please select a namespace.');
-            return;
-          }
+  this.suggestedNetworkPolicies = [];
+  const namespace = this.selectedNamespace;
+  if (!namespace) {
+    alert('Please select a namespace.');
+    return;
+  }
 
-          this.isShowClusterMap = false;
-          this.namespaceVisualizationData = {};
-          this.clusterVisualizationData = [];
-          this.lastScanType = 'namespace';
-          this.scanInitiated = true;
-          this.isLoadingVisualization = true;
+  this.isShowClusterMap = false;
+  this.namespaceVisualizationData = {};
+  this.clusterVisualizationData = [];
+  this.lastScanType = 'namespace';
+  this.scanInitiated = true;
+  this.isLoadingVisualization = true;
 
-          try {
-            const scanResponse = await axios.get(`/scan?namespace=${namespace}`);
-            this.scanResults = scanResponse.data;
-            if (scanResponse.data.UnprotectedPods && scanResponse.data.UnprotectedPods.length > 0) {
-              this.unprotectedPods = this.parseUnprotectedPods(scanResponse.data.UnprotectedPods);
-              this.netfetchScore = scanResponse.data.Score || null;
-            } else {
-              this.unprotectedPods = [];
-              this.netfetchScore = 42;
-            }
-            this.updateExpandedNamespaces();
+  // Determine the scan type based on the component state
+  let scanType = '';
+  if (this.isScanForNative) {
+    scanType = 'native';
+  } else if (this.isScanForCilium) {
+    scanType = 'cilium';
+  }
 
-            // Fetch visualization data only for the scanned namespace
-            await this.fetchVisualizationDataForNamespaces([namespace]);
-          } catch (error) {
-            console.error('Error scanning namespace:', namespace, error);
-            this.message = { type: 'error', text: `Failed to scan namespace: ${namespace}. Error: ${error.message}` };
-          } finally {
-            this.isLoadingVisualization = false;
-          }
-        }
-      },
+  try {
+    // Include the scan type in the request to the server
+    const scanResponse = await axios.get(`/scan?namespace=${namespace}&scanType=${scanType}`);
+    this.scanResults = scanResponse.data;
+    if (scanResponse.data.UnprotectedPods && scanResponse.data.UnprotectedPods.length > 0) {
+      this.unprotectedPods = this.parseUnprotectedPods(scanResponse.data.UnprotectedPods);
+      this.netfetchScore = scanResponse.data.Score || null;
+    } else {
+      this.unprotectedPods = [];
+      this.netfetchScore = 42;
+    }
+    this.updateExpandedNamespaces();
+
+    // Fetch visualization data only for the scanned namespace
+    await this.fetchVisualizationDataForNamespaces([namespace]);
+  } catch (error) {
+    console.error('Error scanning namespace:', namespace, error);
+    this.message = { type: 'error', text: `Failed to scan namespace: ${namespace}. Error: ${error.message}` };
+  } finally {
+    this.isLoadingVisualization = false;
+  }
+},
       // Fetch and update visualization data for multiple namespaces
       async fetchVisualizationDataForNamespaces(namespaces) {
         this.isLoadingVisualization = true;
