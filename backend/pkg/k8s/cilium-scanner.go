@@ -132,11 +132,11 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 			unstructuredPolicies = append(unstructuredPolicies, policy)
 		}
 
-		hasDenyAll := hasDefaultDenyAllCiliumPolicy(unstructuredPolicies)
+		hasDenyAll := HasDefaultDenyAllCiliumPolicy(unstructuredPolicies)
 		coveredPods := make(map[string]bool)
 
 		for _, policyUnstructured := range policies.Items {
-			if isDefaultDenyAllCiliumPolicy(policyUnstructured) {
+			if IsDefaultDenyAllCiliumPolicy(policyUnstructured) {
 				hasDenyAll = true
 			}
 			policyMap := policyUnstructured.UnstructuredContent()
@@ -153,7 +153,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				continue
 			}
 
-			labelSelector, err := convertEndpointToSelector(endpointSelector)
+			labelSelector, err := ConvertEndpointToSelector(endpointSelector)
 			if err != nil {
 				fmt.Fprintf(writer, "Error converting endpoint selector to label selector for policy %s: %s\n", policyUnstructured.GetName(), err)
 				continue
@@ -187,8 +187,8 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				// Check if the pod is globally protected. If it is, skip it.
 				if _, protectedGlobally := globallyProtectedPods[podIdentifier]; !protectedGlobally {
 					// Check if the pod is protected by the policies. If it's protected, it'll also be added to globallyProtectedPods
-					if isPodProtected(clientset, pod, unstructuredPolicies, hasDenyAll, globallyProtectedPods) {
-						fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
+					if IsPodProtected(clientset, pod, unstructuredPolicies, hasDenyAll, globallyProtectedPods) {
+						// [DEBUG] fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
 					} else {
 						// Handle unprotected pod
 						podDetail := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
@@ -216,7 +216,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 						survey.AskOne(prompt, &confirm, nil)
 
 						if confirm {
-							err := createAndApplyDefaultDenyCiliumPolicy(nsName, dynamicClient)
+							err := CreateAndApplyDefaultDenyCiliumPolicy(nsName, dynamicClient)
 							if err != nil {
 								fmt.Printf("\nFailed to apply default deny Cilium policy in namespace %s: %s\n", nsName, err)
 							} else {
@@ -271,7 +271,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				for _, ns := range deniedNamespaces {
 					fmt.Println(" -", ns)
 				}
-				printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a cilium network policy. Check the Kubernetes documentation for more information on cilium network policies: https://docs.cilium.io/en/latest/security/policy/\n")
+				printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a cilium network policy. Check the Cilium documentation for more information on cilium network policies: https://docs.cilium.io/en/latest/security/policy/\n")
 			} else {
 				printToBoth(writer, "\nNetfetch scan completed!\n")
 			}
@@ -290,7 +290,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 }
 
 // ScanCiliumClusterwideNetworkPolicies scans the cluster for Cilium Clusterwide Network Policies
-func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, printMessages bool, isCLI bool) (*ScanResult, error) {
+func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, printMessages bool, dryRun bool, isCLI bool) (*ScanResult, error) {
 	// Buffer and writer setup to capture output for both console and file.
 	var output bytes.Buffer
 	writer := bufio.NewWriter(&output)
@@ -380,7 +380,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	// Iterate through each policy to determine its type
 	for _, policy := range policies.Items {
-		isDenyAll, isClusterWide := isDefaultDenyAllCiliumClusterwidePolicy(policy)
+		isDenyAll, isClusterWide := IsDefaultDenyAllCiliumClusterwidePolicy(policy)
 		if isDenyAll {
 			defaultDenyAllFound = true
 			if isClusterWide {
@@ -398,31 +398,39 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	// Report findings based on the policy types found
 	if appliesToEntireCluster {
 		printToBoth(writer, "Cluster wide default deny all policy detected.\n")
-	} else if defaultDenyAllFound && partialDenyAllFound {
-		printToBoth(writer, "Policy detected, but it does not apply to the entire cluster. Partial policies: ")
-		for _, pName := range partialDenyAllPolicies {
-			printToBoth(writer, pName+" ")
-		}
-		printToBoth(writer, "\n")
-	} else if !defaultDenyAllFound && isCLI {
-		// Prompt to create a default deny-all policy if none is found
-		printToBoth(writer, "No cluster-wide default deny all policy detected.\n")
-		createPolicy := false
-		prompt := &survey.Confirm{
-			Message: "Do you want to create a cluster wide default deny all cilium network policy?",
-		}
-		survey.AskOne(prompt, &createPolicy, nil)
+	} else {
+		var promptForPolicyCreation bool
 
-		if createPolicy {
-			err := createAndApplyDefaultDenyCiliumClusterwidePolicy(dynamicClient)
-			if err != nil {
-				printToBoth(writer, fmt.Sprintf("\nFailed to apply default deny Cilium clusterwide policy: %s\n", err))
-			} else {
-				printToBoth(writer, "\nApplied cluster wide default deny cilium policy\n")
-				scanResult.PolicyChangesMade = true
+		if !appliesToEntireCluster && partialDenyAllFound && defaultDenyAllFound {
+			printToBoth(writer, "Policies detected, but no cluster-wide default deny-all policy in place.\nPartial cluster wide policies in effect:\n")
+			for _, pName := range partialDenyAllPolicies {
+				printToBoth(writer, "- "+pName+"\n")
 			}
-		} else {
-			scanResult.UserDeniedPolicies = true
+			printToBoth(writer, "\n")
+			promptForPolicyCreation = true
+		} else if !defaultDenyAllFound {
+			promptForPolicyCreation = true
+		}
+
+		if promptForPolicyCreation && isCLI && !dryRun {
+			// Prompt to create a default deny-all policy
+			createPolicy := false
+			prompt := &survey.Confirm{
+				Message: "Do you want to create a cluster wide default deny all cilium network policy?",
+			}
+			survey.AskOne(prompt, &createPolicy, nil)
+
+			if createPolicy && !dryRun {
+				err := CreateAndApplyDefaultDenyCiliumClusterwidePolicy(dynamicClient)
+				if err != nil {
+					printToBoth(writer, fmt.Sprintf("\nFailed to apply default deny Cilium clusterwide policy: %s\n", err))
+				} else {
+					printToBoth(writer, "\nApplied cluster wide default deny cilium policy\n")
+					scanResult.PolicyChangesMade = true
+				}
+			} else {
+				scanResult.UserDeniedPolicies = true
+			}
 		}
 	}
 
@@ -436,7 +444,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	// Check each pod to see if it's protected by the policies
 	for _, pod := range pods.Items {
-		if isPodProtected(clientset, pod, unstructuredPolicies, defaultDenyAllExists, globallyProtectedPods) {
+		if IsPodProtected(clientset, pod, unstructuredPolicies, defaultDenyAllExists, globallyProtectedPods) {
 			podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 			globallyProtectedPods[podIdentifier] = struct{}{}
 		} else {
@@ -479,70 +487,94 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	return scanResult, nil
 }
 
-func isPodProtected(clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
+func IsPodProtected(clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
+	var output bytes.Buffer
+	writer := bufio.NewWriter(&output)
+
 	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 	if _, protected := globallyProtectedPods[podIdentifier]; protected {
+		printToBoth(writer, fmt.Sprintf("Pod %s is already globally protected\n", podIdentifier))
 		return true
 	}
 
 	if defaultDenyAllExists {
+		printToBoth(writer, fmt.Sprintf("Default deny-all policy exists, marking pod %s as protected\n", podIdentifier))
 		globallyProtectedPods[podIdentifier] = struct{}{}
 		return true
 	}
 
 	// Loop through policies to find any that apply namespace-wide.
 	for _, policy := range policies {
+		policyName := policy.GetName()
+
 		spec, found := policy.UnstructuredContent()["spec"].(map[string]interface{})
 		if !found {
+			printToBoth(writer, fmt.Sprintf("No spec found in policy %s\n", policyName))
 			continue
 		}
 
 		endpointSelector, found, err := unstructured.NestedMap(spec, "endpointSelector", "matchLabels")
 		if err != nil {
-			fmt.Printf("Error reading endpointSelector from policy %s: %v\n", policy.GetName(), err)
+			printToBoth(writer, fmt.Sprintf("Error reading endpointSelector from policy %s: %v\n", policy.GetName(), err))
 			continue
 		}
 		if !found {
+			printToBoth(writer, fmt.Sprintf("No endpointSelector found in policy %s\n", policyName))
 			continue
 		}
 
 		// Check if the policy applies to the entire namespace.
 		if val, ok := endpointSelector["io.kubernetes.pod.namespace"]; ok && val == pod.Namespace {
+			printToBoth(writer, fmt.Sprintf("Pod %s is covered by cluster wide policy %s\n", podIdentifier, policyName))
 			globallyProtectedPods[podIdentifier] = struct{}{}
 			return true
 		}
 	}
 
 	for _, policy := range policies {
+		policyName := policy.GetName()
+
 		spec, found := policy.UnstructuredContent()["spec"].(map[string]interface{})
 		if !found {
+			printToBoth(writer, fmt.Sprintf("No spec found in policy %s\n", policyName))
 			continue
 		}
 
 		endpointSelector, _, _ := unstructured.NestedMap(spec, "endpointSelector", "matchLabels")
-		isDenyAll, appliesToEntireCluster := isDefaultDenyAllCiliumClusterwidePolicy(*policy)
+		isDenyAll, appliesToEntireCluster := IsDefaultDenyAllCiliumClusterwidePolicy(*policy)
 
 		if isDenyAll && appliesToEntireCluster {
+			printToBoth(writer, fmt.Sprintf("Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
 			globallyProtectedPods[podIdentifier] = struct{}{}
 			return true
 		}
 
-		if matchesLabels(pod.Labels, endpointSelector) {
+		if MatchesLabels(pod.Labels, endpointSelector) {
 			ingress, foundIngress, _ := unstructured.NestedSlice(spec, "ingress")
 			egress, foundEgress, _ := unstructured.NestedSlice(spec, "egress")
 
-			if (foundIngress && (isEmptyOrOnlyContainsEmptyObjects(ingress) || isSpecificallyEmpty(ingress))) || (foundEgress && (isEmptyOrOnlyContainsEmptyObjects(egress) || isSpecificallyEmpty(egress))) || isDenyAll {
+			// Existing checks for empty ingress/egress and deny-all
+			if (foundIngress && (IsEmptyOrOnlyContainsEmptyObjects(ingress) || IsSpecificallyEmpty(ingress))) || (foundEgress && (IsEmptyOrOnlyContainsEmptyObjects(egress) || IsSpecificallyEmpty(egress))) || isDenyAll {
+				printToBoth(writer, fmt.Sprintf("Pod %s is protected by deny-all policy %s\n", podIdentifier, policyName))
+				globallyProtectedPods[podIdentifier] = struct{}{}
+				return true
+			}
+
+			// New check for specific ingress or egress rules
+			if foundIngress && !IsEmptyOrOnlyContainsEmptyObjects(ingress) || foundEgress && !IsEmptyOrOnlyContainsEmptyObjects(egress) {
+				printToBoth(writer, fmt.Sprintf("Pod %s is protected by policy %s with specific rules\n", podIdentifier, policyName))
 				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 		}
 	}
 
+	printToBoth(writer, fmt.Sprintf("Pod %s is not protected by any policy\n", podIdentifier))
 	return false
 }
 
 // Check specifically for a slice that only contains a single empty map ({}), representing a default deny.
-func isSpecificallyEmpty(slice []interface{}) bool {
+func IsSpecificallyEmpty(slice []interface{}) bool {
 	return len(slice) == 1 && len(slice[0].(map[string]interface{})) == 0
 }
 
@@ -575,8 +607,8 @@ func isSpecificallyEmpty(slice []interface{}) bool {
 // 	}
 // }
 
-// matchesLabels checks if the pod's labels match the policy's endpointSelector
-func matchesLabels(podLabels map[string]string, policySelector map[string]interface{}) bool {
+// MatchesLabels checks if the pod's labels match the policy's endpointSelector
+func MatchesLabels(podLabels map[string]string, policySelector map[string]interface{}) bool {
 	for key, value := range policySelector {
 		if val, ok := value.(string); ok {
 			if podVal, podOk := podLabels[key]; !podOk || podVal != val {
@@ -590,8 +622,8 @@ func matchesLabels(podLabels map[string]string, policySelector map[string]interf
 	return true
 }
 
-// convertEndpointToSelector converts the endpointSelector from a CiliumNetworkPolicy to a label selector string.
-func convertEndpointToSelector(endpointSelector map[string]interface{}) (string, error) {
+// ConvertEndpointToSelector converts the endpointSelector from a CiliumNetworkPolicy to a label selector string.
+func ConvertEndpointToSelector(endpointSelector map[string]interface{}) (string, error) {
 	matchLabels, found := endpointSelector["matchLabels"].(map[string]interface{})
 	if !found || len(matchLabels) == 0 {
 		return "", nil
@@ -606,11 +638,12 @@ func convertEndpointToSelector(endpointSelector map[string]interface{}) (string,
 		}
 	}
 
-	return strings.Join(selectorParts, ","), nil
+	labelSelector := strings.Join(selectorParts, ",")
+	return labelSelector, nil
 }
 
-// createAndApplyDefaultDenyCiliumClusterwidePolicy creates and applies a default deny all network policy for Cilium at the cluster level.
-func createAndApplyDefaultDenyCiliumClusterwidePolicy(dynamicClient dynamic.Interface) error {
+// CreateAndApplyDefaultDenyCiliumClusterwidePolicy creates and applies a default deny all network policy for Cilium at the cluster level.
+func CreateAndApplyDefaultDenyCiliumClusterwidePolicy(dynamicClient dynamic.Interface) error {
 	// Construct the policy
 	denyAllPolicy := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -645,8 +678,8 @@ func createAndApplyDefaultDenyCiliumClusterwidePolicy(dynamicClient dynamic.Inte
 	return nil
 }
 
-// isDefaultDenyAllCiliumClusterwidePolicy checks if a single CiliumClusterwideNetworkPolicy is a default deny-all policy
-func isDefaultDenyAllCiliumClusterwidePolicy(policyUnstructured unstructured.Unstructured) (bool, bool) {
+// IsDefaultDenyAllCiliumClusterwidePolicy checks if a single CiliumClusterwideNetworkPolicy is a default deny-all policy
+func IsDefaultDenyAllCiliumClusterwidePolicy(policyUnstructured unstructured.Unstructured) (bool, bool) {
 	spec, found := policyUnstructured.UnstructuredContent()["spec"].(map[string]interface{})
 	if !found {
 		fmt.Println("Spec not found in policy.")
@@ -657,8 +690,8 @@ func isDefaultDenyAllCiliumClusterwidePolicy(policyUnstructured unstructured.Uns
 	egress, egressFound := spec["egress"].([]interface{})
 
 	// Check if ingress and egress are nil or only contain empty objects
-	isIngressEmpty := !ingressFound || isEmptyOrOnlyContainsEmptyObjects(ingress)
-	isEgressEmpty := !egressFound || isEmptyOrOnlyContainsEmptyObjects(egress)
+	isIngressEmpty := !ingressFound || IsEmptyOrOnlyContainsEmptyObjects(ingress)
+	isEgressEmpty := !egressFound || IsEmptyOrOnlyContainsEmptyObjects(egress)
 
 	// Check for default deny-all
 	denyAll := isIngressEmpty && isEgressEmpty
@@ -671,7 +704,7 @@ func isDefaultDenyAllCiliumClusterwidePolicy(policyUnstructured unstructured.Uns
 }
 
 // Helper function to check if the ingress/egress slice is empty or only contains empty objects
-func isEmptyOrOnlyContainsEmptyObjects(slice []interface{}) bool {
+func IsEmptyOrOnlyContainsEmptyObjects(slice []interface{}) bool {
 	if len(slice) == 0 {
 		return true
 	}
@@ -689,8 +722,8 @@ func isEndpointSelectorEmpty(selector map[string]interface{}) bool {
 	return !found || len(matchLabels) == 0
 }
 
-// createAndApplyDefaultDenyCiliumPolicy creates and applies a default deny all network policy for Cilium in the specified namespace.
-func createAndApplyDefaultDenyCiliumPolicy(namespace string, dynamicClient dynamic.Interface) error {
+// CreateAndApplyDefaultDenyCiliumPolicy creates and applies a default deny all network policy for Cilium in the specified namespace.
+func CreateAndApplyDefaultDenyCiliumPolicy(namespace string, dynamicClient dynamic.Interface) error {
 	// Construct the policy name dynamically
 	policyName := namespace + "-cilium-default-deny-all"
 
@@ -730,18 +763,18 @@ func createAndApplyDefaultDenyCiliumPolicy(namespace string, dynamicClient dynam
 	return nil
 }
 
-// hasDefaultDenyAllCiliumPolicy checks if the list of CiliumNetworkPolicies includes a default deny all policy
-func hasDefaultDenyAllCiliumPolicy(policies []*unstructured.Unstructured) bool {
+// HasDefaultDenyAllCiliumPolicy checks if the list of CiliumNetworkPolicies includes a default deny all policy
+func HasDefaultDenyAllCiliumPolicy(policies []*unstructured.Unstructured) bool {
 	for _, policy := range policies {
-		if isDefaultDenyAllCiliumPolicy(*policy) {
+		if IsDefaultDenyAllCiliumPolicy(*policy) {
 			return true
 		}
 	}
 	return false
 }
 
-// isDefaultDenyAllCiliumPolicy checks if a single Cilium policy is a default deny-all policy
-func isDefaultDenyAllCiliumPolicy(policyUnstructured unstructured.Unstructured) bool {
+// IsDefaultDenyAllCiliumPolicy checks if a single Cilium policy is a default deny-all policy
+func IsDefaultDenyAllCiliumPolicy(policyUnstructured unstructured.Unstructured) bool {
 	spec, found := policyUnstructured.UnstructuredContent()["spec"].(map[string]interface{})
 	if !found {
 		return false
