@@ -243,6 +243,9 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 	score := CalculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
 	scanResult.Score = score
 
+	const green = "\033[32m"
+	const reset = "\033[0m"
+
 	if printMessages {
 		if policyChangesMade {
 			fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
@@ -256,10 +259,10 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 				}
 				printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a network policy. Check the Kubernetes documentation for more information on network policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/\n")
 			} else {
-				printToBoth(writer, "\nNetfetch scan completed!\n")
+				printToBoth(writer, green+"\nNetfetch scan completed!"+reset+"\n")
 			}
 		} else {
-			printToBoth(writer, "\nNo network policies missing. You are good to go!\n")
+			printToBoth(writer, green+"\nNo network policies missing. You are good to go!"+reset+"\n")
 		}
 	}
 
