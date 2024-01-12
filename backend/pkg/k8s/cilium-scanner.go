@@ -187,7 +187,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				// Check if the pod is globally protected. If it is, skip it.
 				if _, protectedGlobally := globallyProtectedPods[podIdentifier]; !protectedGlobally {
 					// Check if the pod is protected by the policies. If it's protected, it'll also be added to globallyProtectedPods
-					if IsPodProtected(clientset, pod, unstructuredPolicies, hasDenyAll, globallyProtectedPods) {
+					if IsPodProtected(writer, clientset, pod, unstructuredPolicies, hasDenyAll, globallyProtectedPods) {
 						// [DEBUG] fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
 					} else {
 						// Handle unprotected pod
@@ -232,6 +232,8 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 					// Non-CLI behavior
 					scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
 				}
+
+				printToBoth(writer, "---------------------------------------\n\n")
 			}
 		}
 	}
@@ -260,6 +262,9 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 	score := CalculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
 	scanResult.Score = score
 
+	const green = "\033[32m"
+	const reset = "\033[0m"
+
 	if printMessages {
 		if policyChangesMade {
 			fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
@@ -273,10 +278,10 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				}
 				printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a cilium network policy. Check the Cilium documentation for more information on cilium network policies: https://docs.cilium.io/en/latest/security/policy/\n")
 			} else {
-				printToBoth(writer, "\nNetfetch scan completed!\n")
+				printToBoth(writer, green+"\nNetfetch scan completed!"+reset+"\n")
 			}
 		} else {
-			printToBoth(writer, "\nNo cilium network policies missing. You are good to go!\n")
+			printToBoth(writer, green+"\nNo cilium network policies missing. You are good to go!"+reset+"\n")
 		}
 	}
 
@@ -444,7 +449,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	// Check each pod to see if it's protected by the policies
 	for _, pod := range pods.Items {
-		if IsPodProtected(clientset, pod, unstructuredPolicies, defaultDenyAllExists, globallyProtectedPods) {
+		if IsPodProtected(writer, clientset, pod, unstructuredPolicies, defaultDenyAllExists, globallyProtectedPods) {
 			podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 			globallyProtectedPods[podIdentifier] = struct{}{}
 		} else {
@@ -487,10 +492,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	return scanResult, nil
 }
 
-func IsPodProtected(clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
-	var output bytes.Buffer
-	writer := bufio.NewWriter(&output)
-
+func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
 	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 	if _, protected := globallyProtectedPods[podIdentifier]; protected {
 		printToBoth(writer, fmt.Sprintf("Pod %s is already globally protected\n", podIdentifier))
