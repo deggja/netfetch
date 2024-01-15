@@ -20,6 +20,7 @@
 
   <img src="https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7" width="130px" alt="Netfetch"/>
 
+  [Small demo](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/small-demo.mov)
 </div>
 
 ## Contents
