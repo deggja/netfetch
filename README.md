@@ -32,6 +32,17 @@ Dashboard:
 - Get suggestions for network policies that you can edit & apply to your namespaces by analysing existing pods.
 - Get a score calculated for your cluster or namespace based on the findings of the scans.
 
+## NetworkPolicy type support in Netfetch
+
+Dashboard:
+* Kubernetes
+
+CLI:
+* Kubernetes
+* Cilium
+
+Support for additional types of network policies is in the works. No support for the type you need? Check out the issues for an existing request or create a new one if there is none.
+
 ## Installation via Homebrew for Mac 💻
 
 You can install `netfetch` using our Homebrew tap:
@@ -109,21 +120,31 @@ Scanning a specific namespace is done by selecting the namespace of choice from 
 
 This will populate the table view with all pods not targeted by a network policy in that specific namespace. In addition to this, if there are any pods in the cluster already targeted by a network policy - it will create a visualisation of this in a network map rendered using [D3](https://d3-graph-gallery.com/network.html) below the table view.
 
-![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_new_dash.png)
+![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new_dash.png)
 
 You can click the `Create cluster map` button to do exactly that. This will render a network map with D3, fetching all pods and policies in all the namespaces you have access to in the cluster.
 
+![Cluster map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-clustermap.png)
+
 Inside the network map visualisations, you can double click the network policy nodes to preview the YAML of that policy.
 
-![Network map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/netfetch_network_map.png)
+![Network map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-ns.png)
+
+When scanning a specific namespace using the `Select namespace` dropdown, you may click `Suggest policy` to get network policy suggestions based on your existing workloads.
+
+![Suggested policies](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-suggestpolicy.png)
+
+You may also edit the suggestions inline by using the "Edit" button or copy the YAML of the policy and use it outside of netfetch.
 
 ## Netfetch score 🥇
 
 The `netfetch` tool provides a basic score at the end of each scan. The score ranges from 1 to 42, with 1 being the lowest and 42 being the highest possible score.
 
-As of today, your score will decrease if you are missing implicit default deny all network policies in your namespace or cluster. It will also decrease based on the amount of pods not targeted by a network policy.
+Your score will decrease based on the amount of workloads in your cluster that are running without being targeted by a network policy.
 
-The score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
+The score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage.
+ 
+ If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
 
 ## Uninstalling netfetch
 
