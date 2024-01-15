@@ -1,4 +1,26 @@
-![image](https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7)
+<div align="center">
+  <a href="https://go.dev/">
+    <img src="https://img.shields.io/badge/Go-v1.21-brightgreen.svg" alt="go version">
+  </a>
+  <a href="https://d3js.org/">
+    <img src="https://img.shields.io/badge/D3-v7.8.5-brightgreen.svg" alt="d3 version">
+  </a>
+  <a href="https://nodejs.org/">
+    <img src="https://img.shields.io/badge/Node-v21.5.0-brightgreen.svg" alt="node version">
+  </a>
+  <a href="https://vuejs.org/">
+    <img src="https://img.shields.io/badge/Vue-v5.0.8-brightgreen.svg" alt="vue version">
+  </a>
+</div>
+
+
+<div align="center">
+  <h1>Netfetch</h1>
+  <h3>Scan your Kubernetes clusters and identifiy unprotected workloads and map your existing Network policies</h3>
+
+  <img src="https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7" width="130px" alt="Netfetch"/>
+
+</div>
 
 ## Contents
 - [What is this project?](#-what-is-this-project-)
