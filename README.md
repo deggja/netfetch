@@ -2,6 +2,7 @@
 
 ## Contents
 - [What is this project?](#-what-is-this-project-)
+  - [Support](#networkpolicy-type-support-in-netfetch)
   - [Install with brew](#installation-via-homebrew-for-mac-)
   - [Install in Kubernetes](#installation-via-helm-)
   - [How to use](#usage)
@@ -41,7 +42,7 @@ CLI:
 * Kubernetes
 * Cilium
 
-Support for additional types of network policies is in the works. No support for the type you need? Check out the issues for an existing request or create a new one if there is none.
+Support for additional types of network policies is in the works. No support for the type you need? Check out [issues](https://github.com/deggja/netfetch/issues) for an existing request or create a new one if there is none.
 
 ## Installation via Homebrew for Mac 💻
 
@@ -120,7 +121,7 @@ Scanning a specific namespace is done by selecting the namespace of choice from 
 
 This will populate the table view with all pods not targeted by a network policy in that specific namespace. In addition to this, if there are any pods in the cluster already targeted by a network policy - it will create a visualisation of this in a network map rendered using [D3](https://d3-graph-gallery.com/network.html) below the table view.
 
-![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new_dash.png)
+![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-dash.png)
 
 You can click the `Create cluster map` button to do exactly that. This will render a network map with D3, fetching all pods and policies in all the namespaces you have access to in the cluster.
 
@@ -142,9 +143,7 @@ The `netfetch` tool provides a basic score at the end of each scan. The score ra
 
 Your score will decrease based on the amount of workloads in your cluster that are running without being targeted by a network policy.
 
-The score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage.
- 
- If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
+The score reflects the security posture of your Kubernetes namespaces based on network policies and general policy coverage. If changes are made based on recommendations from the initial scan, rerunning `netfetch` will likely result in a higher score.
 
 ## Uninstalling netfetch
 
