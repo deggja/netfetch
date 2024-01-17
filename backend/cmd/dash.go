@@ -9,6 +9,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/charmbracelet/lipgloss"
 	_ "github.com/deggja/netfetch/backend/statik"
 	"github.com/rakyll/statik/fs"
 
@@ -84,7 +85,9 @@ func startDashboardServer() {
 
 	// Start the server
 	port := "8080"
-	fmt.Printf("Starting dashboard server on http://localhost:%s\n", port)
+	serverURL := fmt.Sprintf("http://localhost:%s", port)
+	startupMessage := HeaderStyle.Render(fmt.Sprintf("Starting dashboard server on %s", serverURL))
+	fmt.Println(startupMessage)
 	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatalf("Failed to start server: %v\n", err)
 	}
@@ -270,3 +273,14 @@ func HandleCreatePolicyRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(createdPolicy)
 }
+
+var HeaderStyle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("6")).
+	Align(lipgloss.Center).
+	PaddingTop(1).
+	PaddingBottom(1).
+	PaddingLeft(4).
+	PaddingRight(4).
+	BorderStyle(lipgloss.NormalBorder()).
+	BorderForeground(lipgloss.Color("99"))
