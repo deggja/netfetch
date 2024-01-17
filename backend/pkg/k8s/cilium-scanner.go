@@ -279,7 +279,6 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 					if IsPodProtected(writer, clientset, pod, unstructuredPolicies, hasDenyAll, globallyProtectedPods) {
 						// [DEBUG] fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
 					} else {
-						// Handle unprotected pod
 						podDetail := []string{pod.Namespace, pod.Name, pod.Status.PodIP}
 						unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
 						unprotectedPodsCount++
