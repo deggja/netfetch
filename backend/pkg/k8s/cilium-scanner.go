@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +23,93 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+// Use lipgloss for neat tables in CLI
+var HeaderAboveTableStyle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("10")).
+	PaddingLeft(0).
+	PaddingRight(0).
+	MarginBottom(1)
+
+var FoundPolicyStyle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("10")).
+	Align(lipgloss.Center).
+	PaddingLeft(0).
+	PaddingRight(4).
+	MarginTop(1).
+	MarginBottom(1)
+
+var PoliciesNotApplyingHeaderStyle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("6")).
+	Align(lipgloss.Center).
+	PaddingLeft(4).
+	PaddingRight(4).
+	MarginTop(1).
+	MarginBottom(1)
+
+var (
+	HeaderStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Align(lipgloss.Center)
+	EvenRowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	OddRowStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+)
+
+func createPodsTable(podsInfo [][]string) string {
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return HeaderStyle
+			case row%2 == 0:
+				return EvenRowStyle
+			default:
+				return OddRowStyle
+			}
+		}).
+		Headers("Namespace", "Pod Name", "IP Address")
+
+	for _, row := range podsInfo {
+		formattedRow := make([]string, 3)
+		for i := 0; i < 3; i++ {
+			if i < len(row) {
+				formattedRow[i] = row[i]
+			} else {
+				formattedRow[i] = "N/A"
+			}
+		}
+
+		t.Row(formattedRow[0], formattedRow[1], formattedRow[2])
+	}
+
+	return t.String()
+}
+
+func createPoliciesTable(policiesInfo [][]string) string {
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == 0:
+				return HeaderStyle
+			case row%2 == 0:
+				return EvenRowStyle
+			default:
+				return OddRowStyle
+			}
+		}).
+		Headers("Policy Name")
+
+	for _, row := range policiesInfo {
+		t.Row(row...)
+	}
+
+	return t.String()
+}
 
 // GetCiliumDynamicClient returns a dynamic interface to query for Cilium policies
 func GetCiliumDynamicClient() (dynamic.Interface, error) {
@@ -173,7 +262,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 		}
 
 		if !hasDenyAll {
-			var unprotectedPodDetails []string
+			var unprotectedPodDetails [][]string
 			allPods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				errorMsg := fmt.Sprintf("Error listing all pods in namespace %s: %s\n", nsName, err)
@@ -191,7 +280,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 						// [DEBUG] fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
 					} else {
 						// Handle unprotected pod
-						podDetail := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
+						podDetail := []string{pod.Namespace, pod.Name, pod.Status.PodIP}
 						unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
 						unprotectedPodsCount++
 					}
@@ -200,13 +289,20 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 
 			if len(unprotectedPodDetails) > 0 {
 				missingPoliciesOrUncoveredPods = true
-				scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
+
+				// Flatten the details and append to scanResult.UnprotectedPods
+				for _, podDetail := range unprotectedPodDetails {
+					flattenedDetail := strings.Join(podDetail, " ")
+					scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, flattenedDetail)
+				}
 				// If CLI mode, interact with the user
 				if isCLI {
-					printToBoth(writer, "\nUnprotected pods found in namespace "+nsName+":\n")
-					for _, detail := range unprotectedPodDetails {
-						printToBoth(writer, detail+"\n")
-					}
+					tableOutput := createPodsTable(unprotectedPodDetails)
+					headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
+					styledHeaderText := HeaderAboveTableStyle.Render(headerText)
+					printToBoth(writer, styledHeaderText+"\n")
+					printToBoth(writer, tableOutput+"\n")
+					fmt.Printf("\n")
 
 					if !dryRun {
 						confirm := false
@@ -232,8 +328,6 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 					// Non-CLI behavior
 					scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
 				}
-
-				printToBoth(writer, "---------------------------------------\n\n")
 			}
 		}
 	}
@@ -338,7 +432,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	for i := range policies.Items {
 		policy := policies.Items[i]
-		policyName := policy.GetName() // or use a more unique identifier if available
+		policyName := policy.GetName()
 
 		// Check if the policy has already been added to the map (and thus the list)
 		if _, exists := policyMap[policyName]; !exists {
@@ -358,8 +452,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		if len(policies.Items) == 0 {
 			printToBoth(writer, "No policies found.\n")
 		} else {
-			// Report the detected policies
-			printToBoth(writer, "Found:\n")
+			printToBoth(writer, "[VERBOSE]: Found:\n")
 			for _, policy := range policies.Items {
 				policyName, _, _ := unstructured.NestedString(policy.UnstructuredContent(), "metadata", "name")
 				printToBoth(writer, "- "+policyName+"\n")
@@ -406,12 +499,23 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	} else {
 		var promptForPolicyCreation bool
 
+		var policiesForTable [][]string
+
 		if !appliesToEntireCluster && partialDenyAllFound && defaultDenyAllFound {
-			printToBoth(writer, "Policies detected, but no cluster-wide default deny-all policy in place.\nPartial cluster wide policies in effect:\n")
 			for _, pName := range partialDenyAllPolicies {
-				printToBoth(writer, "- "+pName+"\n")
+				// Append policy names to the slice for the table
+				policiesForTable = append(policiesForTable, []string{pName})
 			}
-			printToBoth(writer, "\n")
+
+			// Generate the table output for partial policies
+			tableOutput := createPoliciesTable(policiesForTable)
+
+			// Render the headers with styles
+			partialPoliciesHeader := FoundPolicyStyle.Render("Partial cluster wide policies found:")
+
+			// Print the headers and the table output
+			printToBoth(writer, partialPoliciesHeader+"\n")
+			printToBoth(writer, tableOutput+"\n")
 			promptForPolicyCreation = true
 		} else if !defaultDenyAllFound {
 			promptForPolicyCreation = true
@@ -495,12 +599,12 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
 	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 	if _, protected := globallyProtectedPods[podIdentifier]; protected {
-		printToBoth(writer, fmt.Sprintf("Pod %s is already globally protected\n", podIdentifier))
+		printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is already globally protected\n", podIdentifier))
 		return true
 	}
 
 	if defaultDenyAllExists {
-		printToBoth(writer, fmt.Sprintf("Default deny-all policy exists, marking pod %s as protected\n", podIdentifier))
+		printToBoth(writer, fmt.Sprintf("[VERBOSE]: Default deny-all policy exists, marking pod %s as protected\n", podIdentifier))
 		globallyProtectedPods[podIdentifier] = struct{}{}
 		return true
 	}
@@ -527,7 +631,7 @@ func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod c
 
 		// Check if the policy applies to the entire namespace.
 		if val, ok := endpointSelector["io.kubernetes.pod.namespace"]; ok && val == pod.Namespace {
-			printToBoth(writer, fmt.Sprintf("Pod %s is covered by cluster wide policy %s\n", podIdentifier, policyName))
+			printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by cluster wide policy %s\n", podIdentifier, policyName))
 			globallyProtectedPods[podIdentifier] = struct{}{}
 			return true
 		}
@@ -546,7 +650,7 @@ func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod c
 		isDenyAll, appliesToEntireCluster := IsDefaultDenyAllCiliumClusterwidePolicy(*policy)
 
 		if isDenyAll && appliesToEntireCluster {
-			printToBoth(writer, fmt.Sprintf("Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
+			printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
 			globallyProtectedPods[podIdentifier] = struct{}{}
 			return true
 		}
@@ -557,21 +661,21 @@ func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod c
 
 			// Existing checks for empty ingress/egress and deny-all
 			if (foundIngress && (IsEmptyOrOnlyContainsEmptyObjects(ingress) || IsSpecificallyEmpty(ingress))) || (foundEgress && (IsEmptyOrOnlyContainsEmptyObjects(egress) || IsSpecificallyEmpty(egress))) || isDenyAll {
-				printToBoth(writer, fmt.Sprintf("Pod %s is protected by deny-all policy %s\n", podIdentifier, policyName))
+				printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is protected by deny-all policy %s\n", podIdentifier, policyName))
 				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 
 			// New check for specific ingress or egress rules
 			if foundIngress && !IsEmptyOrOnlyContainsEmptyObjects(ingress) || foundEgress && !IsEmptyOrOnlyContainsEmptyObjects(egress) {
-				printToBoth(writer, fmt.Sprintf("Pod %s is protected by policy %s with specific rules\n", podIdentifier, policyName))
+				printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is protected by policy %s with specific rules\n", podIdentifier, policyName))
 				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 		}
 	}
 
-	printToBoth(writer, fmt.Sprintf("Pod %s is not protected by any policy\n", podIdentifier))
+	printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is not protected by any policy\n", podIdentifier))
 	return false
 }
 
