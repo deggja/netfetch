@@ -298,8 +298,8 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				// If CLI mode, interact with the user
 				if isCLI {
 					tableOutput := createPodsTable(unprotectedPodDetails)
-					headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
-					styledHeaderText := HeaderAboveTableStyle.Render(headerText)
+					headerText := fmt.Sprintf(" Unprotected pods found in namespace %s:", nsName)
+					styledHeaderText := HeaderStyle.Render(headerText)
 					printToBoth(writer, styledHeaderText+"\n")
 					printToBoth(writer, tableOutput+"\n")
 					fmt.Printf("\n")
@@ -310,6 +310,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 							Message: fmt.Sprintf("Do you want to add a default deny all Cilium network policy to the namespace %s?", nsName),
 						}
 						survey.AskOne(prompt, &confirm, nil)
+						fmt.Printf("\n")
 
 						if confirm {
 							err := CreateAndApplyDefaultDenyCiliumPolicy(nsName, dynamicClient)
@@ -356,9 +357,6 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 	score := CalculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
 	scanResult.Score = score
 
-	const green = "\033[32m"
-	const reset = "\033[0m"
-
 	if printMessages {
 		if policyChangesMade {
 			fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
@@ -372,10 +370,10 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				}
 				printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a cilium network policy. Check the Cilium documentation for more information on cilium network policies: https://docs.cilium.io/en/latest/security/policy/\n")
 			} else {
-				printToBoth(writer, green+"\nNetfetch scan completed!"+reset+"\n")
+				printToBoth(writer, "\nNetfetch scan completed!\n")
 			}
 		} else {
-			printToBoth(writer, green+"\nNo cilium network policies missing. You are good to go!"+reset+"\n")
+			printToBoth(writer, "\nNo cilium network policies missing. You are good to go!\n")
 		}
 	}
 
@@ -443,7 +441,6 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	}
 
 	if isCLI && !hasStartedCiliumScan {
-		fmt.Println("Checking for cluster wide cilium policies..")
 		hasStartedCiliumScan = true
 	}
 
@@ -511,7 +508,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 			tableOutput := createPoliciesTable(policiesForTable)
 
 			// Render the headers with styles
-			partialPoliciesHeader := FoundPolicyStyle.Render("Partial cluster wide policies found:")
+			partialPoliciesHeader := HeaderStyle.Render("Cluster wide policies in effect:")
 
 			// Print the headers and the table output
 			printToBoth(writer, partialPoliciesHeader+"\n")
@@ -528,6 +525,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 				Message: "Do you want to create a cluster wide default deny all cilium network policy?",
 			}
 			survey.AskOne(prompt, &createPolicy, nil)
+			fmt.Printf("\n")
 
 			if createPolicy && !dryRun {
 				err := CreateAndApplyDefaultDenyCiliumClusterwidePolicy(dynamicClient)
@@ -599,7 +597,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
 	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 	if _, protected := globallyProtectedPods[podIdentifier]; protected {
-		printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is already globally protected\n", podIdentifier))
+		printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is already globally covered\n", podIdentifier))
 		return true
 	}
 
@@ -661,21 +659,21 @@ func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod c
 
 			// Existing checks for empty ingress/egress and deny-all
 			if (foundIngress && (IsEmptyOrOnlyContainsEmptyObjects(ingress) || IsSpecificallyEmpty(ingress))) || (foundEgress && (IsEmptyOrOnlyContainsEmptyObjects(egress) || IsSpecificallyEmpty(egress))) || isDenyAll {
-				printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is protected by deny-all policy %s\n", podIdentifier, policyName))
+				printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
 				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 
 			// New check for specific ingress or egress rules
 			if foundIngress && !IsEmptyOrOnlyContainsEmptyObjects(ingress) || foundEgress && !IsEmptyOrOnlyContainsEmptyObjects(egress) {
-				printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is protected by policy %s with specific rules\n", podIdentifier, policyName))
+				printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by policy %s with specific rules\n", podIdentifier, policyName))
 				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 		}
 	}
 
-	printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is not protected by any policy\n", podIdentifier))
+	printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is not covered by any policy\n", podIdentifier))
 	return false
 }
 

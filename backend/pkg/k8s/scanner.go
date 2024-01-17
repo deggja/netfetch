@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	v1 "k8s.io/api/core/v1"
@@ -28,10 +30,18 @@ import (
 
 // Helper function to write to both buffer and standard output
 func printToBoth(writer *bufio.Writer, s string) {
-	// Print to standard output
+	// Print to standard output with ANSI codes
 	fmt.Print(s)
-	// Write the same output to buffer
-	fmt.Fprint(writer, s)
+
+	// Write to buffer without ANSI codes
+	cleanString := StripANSICodes(s)
+	fmt.Fprint(writer, cleanString)
+}
+
+// StripANSICodes removes ANSI escape codes from a string
+func StripANSICodes(str string) string {
+	ansi := regexp.MustCompile(`\x1B\[[0-9;]*[a-zA-Z]`)
+	return ansi.ReplaceAllString(str, "")
 }
 
 // Struct to represent scan results in dashboard
@@ -114,7 +124,6 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 	deniedNamespaces := []string{}
 
 	if isCLI && !hasStartedNativeScan {
-		fmt.Println("Policy type: Kubernetes")
 		hasStartedNativeScan = true
 	}
 
@@ -150,6 +159,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 		}
 
 		if !hasDenyAll {
+			var unprotectedPodDetailsForTable [][]string
 			var unprotectedPodDetails []string
 			allPods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
@@ -160,9 +170,11 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 
 			for _, pod := range allPods.Items {
 				if !coveredPods[pod.Name] {
-					podDetail := fmt.Sprintf("%s %s %s", nsName, pod.Name, pod.Status.PodIP)
-					if !containsPodDetail(scanResult.UnprotectedPods, podDetail) {
-						unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
+					podDetail := []string{nsName, pod.Name, pod.Status.PodIP}
+					unprotectedPodDetailsForTable = append(unprotectedPodDetailsForTable, podDetail)
+					flattenedPodDetail := strings.Join(podDetail, " ")
+					if !containsPodDetail(scanResult.UnprotectedPods, flattenedPodDetail) {
+						unprotectedPodDetails = append(unprotectedPodDetails, flattenedPodDetail)
 						unprotectedPodsCount++
 					}
 				}
@@ -175,47 +187,40 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 					if !contains(scanResult.DeniedNamespaces, nsName) {
 						scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
 					}
-					scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
-				}
-			}
+				} else {
+					tableOutput := createPodsTable(unprotectedPodDetailsForTable)
+					headerText := fmt.Sprintf(" Unprotected pods found in namespace %s:", nsName)
+					styledHeaderText := HeaderStyle.Render(headerText)
+					printToBoth(writer, styledHeaderText+"\n"+tableOutput+"\n")
 
-			if !hasDenyAll && len(unprotectedPodDetails) > 0 && isCLI {
-				if len(unprotectedPodDetails) > 0 {
-					printToBoth(writer, "\nUnprotected Pods found in namespace "+nsName+":\n")
-					for _, detail := range unprotectedPodDetails {
-						printToBoth(writer, detail+"\n")
-					}
-				}
-
-				if !dryRun {
-					confirm := false
-					prompt := &survey.Confirm{
-						Message: fmt.Sprintf("Do you want to add a default deny all network policy to the namespace %s?", nsName),
-					}
-					survey.AskOne(prompt, &confirm, nil)
-
-					if confirm {
-						err := createAndApplyDefaultDenyPolicy(nsName)
-						if err != nil {
-							errorPolicyMsg := fmt.Sprintf("\nFailed to apply default deny policy in namespace %s: %s\n", nsName, err)
-							printToBoth(writer, errorPolicyMsg)
-						} else {
-							successPolicyMsg := fmt.Sprintf("\nApplied default deny policy in namespace %s\n", nsName)
-							printToBoth(writer, successPolicyMsg)
-							policyChangesMade = true
+					if !dryRun {
+						confirm := false
+						prompt := &survey.Confirm{
+							Message: fmt.Sprintf("Do you want to add a default deny all network policy to the namespace %s?", nsName),
 						}
-					} else {
-						userDeniedPolicyApplication = true
-						deniedNamespaces = append(deniedNamespaces, nsName)
+						survey.AskOne(prompt, &confirm, nil)
+						fmt.Printf("\n")
+
+						if confirm {
+							err := createAndApplyDefaultDenyPolicy(nsName)
+							if err != nil {
+								errorPolicyMsg := fmt.Sprintf("\nFailed to apply default deny policy in namespace %s: %s\n", nsName, err)
+								printToBoth(writer, errorPolicyMsg)
+							} else {
+								successPolicyMsg := fmt.Sprintf("\nApplied default deny policy in namespace %s\n", nsName)
+								printToBoth(writer, successPolicyMsg)
+								fmt.Printf("\n")
+								policyChangesMade = true
+							}
+						} else {
+							userDeniedPolicyApplication = true
+							deniedNamespaces = append(deniedNamespaces, nsName)
+						}
 					}
 				}
-			} else {
+			} else if !contains(scanResult.DeniedNamespaces, nsName) {
 				scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
-				if len(unprotectedPodDetails) > 0 {
-					scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails...)
-				}
 			}
-
 		}
 	}
 
@@ -243,9 +248,6 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 	score := CalculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
 	scanResult.Score = score
 
-	const green = "\033[32m"
-	const reset = "\033[0m"
-
 	if printMessages {
 		if policyChangesMade {
 			fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
@@ -259,10 +261,10 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 				}
 				printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a network policy. Check the Kubernetes documentation for more information on network policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/\n")
 			} else {
-				printToBoth(writer, green+"\nNetfetch scan completed!"+reset+"\n")
+				printToBoth(writer, "\nNetfetch scan completed!\n")
 			}
 		} else {
-			printToBoth(writer, green+"\nNo network policies missing. You are good to go!"+reset+"\n")
+			printToBoth(writer, "\nNo network policies missing. You are good to go!\n")
 		}
 	}
 
@@ -355,7 +357,7 @@ func HandleScanRequest(w http.ResponseWriter, r *http.Request) {
 	namespace := r.URL.Query().Get("namespace")
 
 	// Perform the scan
-	result, err := ScanNetworkPolicies(namespace, false, true, false, true, false)
+	result, err := ScanNetworkPolicies(namespace, false, true, false, false, false)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -425,6 +427,7 @@ func GetClientset() (*kubernetes.Clientset, error) {
 		} else {
 			kubeconfig = filepath.Join(homedir.HomeDir(), ".kube", "config")
 			fmt.Println("Using default kubeconfig path:", kubeconfig)
+			fmt.Printf("\n")
 		}
 
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
