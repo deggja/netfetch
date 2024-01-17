@@ -115,6 +115,8 @@ Run `netfetch` in dryrun against a namespace
 netfetch scan production --dryrun
 ```
 
+![netfetch-demo](https://github.com/deggja/netfetch/assets/15778492/015e9d9f-a678-4a14-a8bd-607f02c13d9f)
+
 Scan entire cluster.
 
 ```sh
@@ -125,6 +127,18 @@ Scan a namespace called production.
 
 ```sh
 netfetch scan production
+```
+
+Scan entire cluster for Cilium Network Policies.
+
+```sh
+netfetch scan --cilium
+```
+
+Scan a namespace called production.
+
+```sh
+netfetch scan production --cilium
 ```
 
 ### Using the dashboard 📟
