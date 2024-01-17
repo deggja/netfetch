@@ -190,6 +190,7 @@ Netfetch uses other tools for a plethora of different things. It would not be po
 - [D3](https://d3-graph-gallery.com/network.html)
 - [Helm](https://helm.sh/docs/)
 - [Brew](https://brew.sh/)
+- [lipgloss](https://github.com/charmbracelet/lipgloss)
 
 ## License
 
