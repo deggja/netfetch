@@ -56,7 +56,7 @@ var scanCmd = &cobra.Command{
 				} else {
 					// Handle the cluster-wide scan result; skip further scanning if all pods are protected
 					if clusterwideScanResult.AllPodsProtected {
-						fmt.Println("All pods are protected by cluster wide cilium policies. Skipping individual namespace scan.")
+						fmt.Println("All pods are protected by cluster wide cilium policies.\nYour Netfetch security score is: 42/42")
 						return
 					}
 					handleScanResult(clusterwideScanResult)
