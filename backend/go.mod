@@ -10,11 +10,13 @@ require (
 	k8s.io/client-go v0.28.4
 )
 
-require github.com/rakyll/statik v0.1.7
+require (
+	github.com/charmbracelet/lipgloss v0.9.1
+	github.com/rakyll/statik v0.1.7
+)
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/charmbracelet/lipgloss v0.9.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
