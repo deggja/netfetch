@@ -497,7 +497,7 @@
         }
 
         this.unprotectedPods = [];
-        this.scanInitiated = false;
+        this.scanInitiated = true;
         this.message = null;
 
         try {
