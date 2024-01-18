@@ -63,7 +63,7 @@
           </label>
           <label class="checkbox-container">
             cilium
-            <input type="checkbox" v-model="isScanForCilium" @change="isScanForNative = false">
+            <input type="checkbox" v-model="isScanForCilium" @change="isScanForNative = false" disabled>
             <span class="checkmark"></span>
           </label>
           <label class="checkbox-container">
