@@ -193,6 +193,12 @@ brew untap deggja/netfetch https://github.com/deggja/netfetch
 ```
 
 ## Contribute 🔨
+Thank you to the following awesome people:
+
+- [s-rd](https://github.com/s-rd) - logo
+- [JJGadgets](https://github.com/JJGadgets) - testing
+- [Home Operations Discord](https://github.com/onedr0p/home-ops) - testing
+
 You are welcome to contribute!
 
 See [CONTRIBUTING](CONTRIBUTING.md) for instructions on how to proceed.
