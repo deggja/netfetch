@@ -15,10 +15,11 @@
 
 
 <div align="center">
+
   <h1>Netfetch</h1>
   <h3>Scan your Kubernetes clusters to identifiy unprotected workloads and map your existing Network policies</h3>
-
-  <img src="https://github.com/deggja/netfetch/assets/15778492/b9a93dce-a09a-4823-be99-dcda5dbf6dc7" width="130px" alt="Netfetch"/>
+  
+  <img src="https://github.com/deggja/netfetch/assets/17279882/64306f2f-abbf-462c-97d6-a326ca70c2ad" width="130px" alt="Netfetch"/>
 
 </div>
 
