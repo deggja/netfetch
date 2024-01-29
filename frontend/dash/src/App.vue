@@ -4,7 +4,7 @@
       <aside class="sidebar">
         <div class="sidebar-content">
           <div class="logo-container">
-            <img src="@/assets/logo.png" alt="Netfetch Logo" class="logo">
+            <img src="@/assets/logo_blue.png" alt="Netfetch Logo" class="logo">
           </div>
           <ul class="menu">
             <li class="menu-item">
@@ -780,6 +780,12 @@
 
   .logo-container {
     margin-bottom: 20px;
+  }
+
+  .logo-container .logo {
+    width: 100px; /* Example size, adjust as needed */
+    height: auto; /* Maintain aspect ratio */
+    display: block; /* To ensure it respects the width and height */
   }
 
   .menu {
