@@ -29,8 +29,8 @@
 - **[Installation](#installation)**
   - [Install with brew](#installation-via-homebrew-for-mac-)
   - [Install in Kubernetes](#installation-via-helm-)
-- [**Get started**](#get-started)
-  - [How to use](#usage)
+- [**Usage**](#usage)
+  - [Get started](#get-started)
   - [Dashboard](#using-the-dashboard-)
   - [Score](#netfetch-score-)
   - [Uninstalling](#uninstalling-netfetch)
@@ -99,9 +99,9 @@ Follow the instructions after deployment to access the dashboard.
 - Access to a Kubernetes cluster with `kubectl` configured.
 - Permissions to read and create network policies.
 
-## Get started
+## Usage
 
-### Usage
+### Get started
 
 The primary command provided by `netfetch` is `scan`. This command scans all non-system Kubernetes namespaces for network policies.
 
