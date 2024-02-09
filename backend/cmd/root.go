@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "3.2.1"
+var Version string
 
 var rootCmd = &cobra.Command{
 	Use:   "netfetch",
@@ -33,7 +33,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number of Netfetch",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Netfetch Version: %s\n", version)
+		fmt.Printf(Version + "\n")
 	},
 }
 
