@@ -33,7 +33,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number of Netfetch",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Netfetch Version: %s\n", Version)
+		fmt.Printf(Version + "\n")
 	},
 }
 
