@@ -1,6 +1,23 @@
 # .goreleaser.yml
 project_name: netfetch
 
+changelog:
+  sort: desc
+  filters:
+    exclude:
+      - '^Merge pull request'
+      - '^chore:'
+      - '^refactor:'
+      - '^style:'
+      - '^test:'
+  groups:
+    - title: "Features"
+      regexp: "^feat:"
+    - title: "Bug Fixes"
+      regexp: "^fix:"
+    - title: "Documentation Updates"
+      regexp: "^docs:"
+
 # Build configuration
 builds:
   - id: "netfetch"
@@ -13,6 +30,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    ldflags:
+      - -s -w -X 'github.com/deggja/netfetch/backend/cmd.Version={{.Version}}'
     # Additional build flags can be added here
 
 # Archive configuration
