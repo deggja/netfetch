@@ -15,6 +15,6 @@ class Netfetch < Formula
   end
 
   test do
-    system "#{bin}/netfetch", "--version"
+    system "#{bin}/netfetch", "version"
   end
 end
