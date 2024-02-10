@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 )
 
 // VisualizationData represents the structure of network policy and pod data for visualization.
@@ -25,12 +26,7 @@ type PolicyVisualization struct {
 }
 
 // gatherVisualizationData retrieves network policies and associated pods for visualization.
-func gatherVisualizationData(namespace string) (*VisualizationData, error) {
-	clientset, err := GetClientset()
-	if err != nil {
-		return nil, err
-	}
-
+func gatherVisualizationData(clientset *kubernetes.Clientset, namespace string) (*VisualizationData, error) {
 	// Retrieve all network policies in the specified namespace
 	policies, err := clientset.NetworkingV1().NetworkPolicies(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -82,7 +78,12 @@ func HandleVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 
 	namespace := r.URL.Query().Get("namespace")
 
-	vizData, err := gatherVisualizationData(namespace)
+	clientset, err := GetClientset()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	vizData, err := gatherVisualizationData(clientset, namespace)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -135,8 +136,13 @@ func GatherClusterVisualizationData() ([]VisualizationData, error) {
 	// Slice to hold the visualization data for the entire cluster
 	var clusterVizData []VisualizationData
 
+	clientset, err := GetClientset()
+	if err != nil {
+		return nil, err
+	}
+
 	for _, namespace := range namespacesWithPolicies {
-		vizData, err := gatherVisualizationData(namespace)
+		vizData, err := gatherVisualizationData(clientset, namespace)
 		if err != nil {
 			log.Printf("Error gathering visualization data for namespace %s: %v\n", namespace, err)
 			continue
