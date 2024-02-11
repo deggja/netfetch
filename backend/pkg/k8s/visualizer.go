@@ -169,7 +169,8 @@ func HandlePolicyYAMLRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve the network policy YAML
-	yaml, err := getNetworkPolicyYAML(namespace, policyName)
+	clientset, err := GetClientset()
+	yaml, err := getNetworkPolicyYAML(clientset, namespace, policyName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -180,12 +181,7 @@ func HandlePolicyYAMLRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // getNetworkPolicyYAML retrieves the YAML representation of a network policy, excluding annotations.
-func getNetworkPolicyYAML(namespace, policyName string) (string, error) {
-	clientset, err := GetClientset()
-	if err != nil {
-		return "", err
-	}
-
+func getNetworkPolicyYAML(clientset kubernetes.Interface, namespace string, policyName string) (string, error) {
 	// Get the specified network policy
 	networkPolicy, err := clientset.NetworkingV1().NetworkPolicies(namespace).Get(context.TODO(), policyName, metav1.GetOptions{})
 	if err != nil {
