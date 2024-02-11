@@ -26,7 +26,7 @@ type PolicyVisualization struct {
 }
 
 // gatherVisualizationData retrieves network policies and associated pods for visualization.
-func gatherVisualizationData(clientset *kubernetes.Clientset, namespace string) (*VisualizationData, error) {
+func gatherVisualizationData(clientset kubernetes.Interface, namespace string) (*VisualizationData, error) {
 	// Retrieve all network policies in the specified namespace
 	policies, err := clientset.NetworkingV1().NetworkPolicies(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
