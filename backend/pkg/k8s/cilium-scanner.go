@@ -449,7 +449,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		if len(policies.Items) == 0 {
 			printToBoth(writer, "No policies found.\n")
 		} else {
-			printToBoth(writer, "[VERBOSE]: Found:\n")
+			// printToBoth(writer, "[VERBOSE]: Found:\n")
 			for _, policy := range policies.Items {
 				policyName, _, _ := unstructured.NestedString(policy.UnstructuredContent(), "metadata", "name")
 				printToBoth(writer, "- "+policyName+"\n")
@@ -597,12 +597,12 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
 	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 	if _, protected := globallyProtectedPods[podIdentifier]; protected {
-		printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is already globally covered\n", podIdentifier))
+		// printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is already globally covered\n", podIdentifier))
 		return true
 	}
 
 	if defaultDenyAllExists {
-		printToBoth(writer, fmt.Sprintf("[VERBOSE]: Default deny-all policy exists, marking pod %s as protected\n", podIdentifier))
+		// printToBoth(writer, fmt.Sprintf("[VERBOSE]: Default deny-all policy exists, marking pod %s as protected\n", podIdentifier))
 		globallyProtectedPods[podIdentifier] = struct{}{}
 		return true
 	}
@@ -622,14 +622,14 @@ func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod c
 			printToBoth(writer, fmt.Sprintf("Error reading endpointSelector from policy %s: %v\n", policy.GetName(), err))
 			continue
 		}
-		if !found {
-			printToBoth(writer, fmt.Sprintf("No endpointSelector found in policy %s\n", policyName))
+		if !found || len(endpointSelector) == 0 {
+			// rintToBoth(writer, fmt.Sprintf("[VERBOSE]: Policy %s applies to all endpoints due to empty selector\n", policyName))
 			continue
 		}
 
 		// Check if the policy applies to the entire namespace.
 		if val, ok := endpointSelector["io.kubernetes.pod.namespace"]; ok && val == pod.Namespace {
-			printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by cluster wide policy %s\n", podIdentifier, policyName))
+			// printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by cluster wide policy %s\n", podIdentifier, policyName))
 			globallyProtectedPods[podIdentifier] = struct{}{}
 			return true
 		}
@@ -648,7 +648,7 @@ func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod c
 		isDenyAll, appliesToEntireCluster := IsDefaultDenyAllCiliumClusterwidePolicy(*policy)
 
 		if isDenyAll && appliesToEntireCluster {
-			printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
+			// printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
 			globallyProtectedPods[podIdentifier] = struct{}{}
 			return true
 		}
@@ -659,21 +659,21 @@ func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod c
 
 			// Existing checks for empty ingress/egress and deny-all
 			if (foundIngress && (IsEmptyOrOnlyContainsEmptyObjects(ingress) || IsSpecificallyEmpty(ingress))) || (foundEgress && (IsEmptyOrOnlyContainsEmptyObjects(egress) || IsSpecificallyEmpty(egress))) || isDenyAll {
-				printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
+				// printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by deny-all policy %s\n", podIdentifier, policyName))
 				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 
 			// New check for specific ingress or egress rules
 			if foundIngress && !IsEmptyOrOnlyContainsEmptyObjects(ingress) || foundEgress && !IsEmptyOrOnlyContainsEmptyObjects(egress) {
-				printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by policy %s with specific rules\n", podIdentifier, policyName))
+				// printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is covered by policy %s with specific rules\n", podIdentifier, policyName))
 				globallyProtectedPods[podIdentifier] = struct{}{}
 				return true
 			}
 		}
 	}
 
-	printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is not covered by any policy\n", podIdentifier))
+	// printToBoth(writer, fmt.Sprintf("[VERBOSE]: Pod %s is not covered by any policy\n", podIdentifier))
 	return false
 }
 
