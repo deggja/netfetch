@@ -7,25 +7,27 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
-    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestGatherVisualizationData(t *testing.T) {
-	var clientset kubernetes.Clientset
-	clientset = fake.NewSimpleClientset()
+	var clientset kubernetes.Interface = fake.NewSimpleClientset()
 
 	// Creating a pod object and a networkPolicy object
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pod", 
+			Name:      "test-pod",
 			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"app": "test", // Label on pod to match netpol selector
+			},
 		},
 	}
 	networkPolicy := &netv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-policy", 
+			Name:      "test-policy",
 			Namespace: "test-namespace",
 		},
 		Spec: netv1.NetworkPolicySpec{
@@ -38,12 +40,12 @@ func TestGatherVisualizationData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
-	_, erro := clientset.NetworkingV1().NetworkPolicies("test-namespace").Create(context.TODO(), networkPolicy, metav1.CreateOptions{})
+	_, err = clientset.NetworkingV1().NetworkPolicies("test-namespace").Create(context.TODO(), networkPolicy, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Failed to create network policy: %v", erro)
+		t.Fatalf("Failed to create network policy: %v", err)
 	}
 
-	visualizationData, err := gatherVisualizationData(&clientset, "test-namespace")
+	visualizationData, err := gatherVisualizationData(clientset, "test-namespace")
 	if err != nil {
 		t.Fatalf("Error occurred while gathering visualization data: %v", err)
 	}
