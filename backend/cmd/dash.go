@@ -130,7 +130,13 @@ func handleNamespacesWithPoliciesRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	namespaces, err := k8s.GatherNamespacesWithPolicies()
+	clientset, err := k8s.GetClientset()
+	if err != nil {
+		log.Fatalf("You are not connected to a Kubernetes cluster. Please connect to a cluster and re-run the command: %v", err)
+		return
+	}
+
+	namespaces, err := k8s.GatherNamespacesWithPolicies(clientset)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -188,8 +194,15 @@ func handleClusterVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+
+	clientset, err := k8s.GetClientset()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Call the function to gather cluster-wide visualization data
-	clusterVizData, err := k8s.GatherClusterVisualizationData()
+	clusterVizData, err := k8s.GatherClusterVisualizationData(clientset)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
