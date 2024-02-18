@@ -83,6 +83,7 @@ func HandleVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	vizData, err := gatherVisualizationData(clientset, namespace)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -96,12 +97,7 @@ func HandleVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // gatherNamespacesWithPolicies returns a list of all namespaces that contain network policies.
-func GatherNamespacesWithPolicies() ([]string, error) {
-	clientset, err := GetClientset()
-	if err != nil {
-		return nil, err
-	}
-
+func GatherNamespacesWithPolicies(clientset kubernetes.Interface) ([]string, error) {
 	// Retrieve all namespaces
 	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -127,19 +123,14 @@ func GatherNamespacesWithPolicies() ([]string, error) {
 }
 
 // gatherClusterVisualizationData retrieves visualization data for all namespaces with network policies.
-func GatherClusterVisualizationData() ([]VisualizationData, error) {
-	namespacesWithPolicies, err := GatherNamespacesWithPolicies()
+func GatherClusterVisualizationData(clientset kubernetes.Interface) ([]VisualizationData, error) {
+	namespacesWithPolicies, err := GatherNamespacesWithPolicies(clientset)
 	if err != nil {
 		return nil, err
 	}
 
 	// Slice to hold the visualization data for the entire cluster
 	var clusterVizData []VisualizationData
-
-	clientset, err := GetClientset()
-	if err != nil {
-		return nil, err
-	}
 
 	for _, namespace := range namespacesWithPolicies {
 		vizData, err := gatherVisualizationData(clientset, namespace)
@@ -170,6 +161,11 @@ func HandlePolicyYAMLRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Retrieve the network policy YAML
 	clientset, err := GetClientset()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	yaml, err := getNetworkPolicyYAML(clientset, namespace, policyName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
