@@ -518,7 +518,7 @@ type ContainerPortInfo struct {
 	Protocol      v1.Protocol
 }
 
-func GetPodInfo(clientset *kubernetes.Clientset, namespace string) ([]PodInfo, error) {
+func GetPodInfo(clientset kubernetes.Interface, namespace string) ([]PodInfo, error) {
 	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
