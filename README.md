@@ -197,6 +197,28 @@ brew cleanup -s netfetch
 brew untap deggja/netfetch https://github.com/deggja/netfetch
 ```
 
+## Running Tests
+
+To run tests for this project, follow these steps:
+
+1. Navigate to the root directory of the project in your terminal.
+
+2. Navigate to the backend directory within the project:
+
+```
+cd backend
+```
+
+3. Run the following command to execute all tests in the project:
+
+```
+go test ./...
+```
+
+This command will recursively search for tests in all subdirectories (./...) and run them.
+
+4. After executing the command, you will see the test results in the terminal output.
+
 ## Contribute 🔨
 Thank you to the following awesome people:
 
