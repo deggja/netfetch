@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 )
 
 // VisualizationData represents the structure of network policy and pod data for visualization.
@@ -25,12 +26,7 @@ type PolicyVisualization struct {
 }
 
 // gatherVisualizationData retrieves network policies and associated pods for visualization.
-func gatherVisualizationData(namespace string) (*VisualizationData, error) {
-	clientset, err := GetClientset()
-	if err != nil {
-		return nil, err
-	}
-
+func gatherVisualizationData(clientset kubernetes.Interface, namespace string) (*VisualizationData, error) {
 	// Retrieve all network policies in the specified namespace
 	policies, err := clientset.NetworkingV1().NetworkPolicies(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -82,7 +78,13 @@ func HandleVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 
 	namespace := r.URL.Query().Get("namespace")
 
-	vizData, err := gatherVisualizationData(namespace)
+	clientset, err := GetClientset()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	vizData, err := gatherVisualizationData(clientset, namespace)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -95,12 +97,7 @@ func HandleVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // gatherNamespacesWithPolicies returns a list of all namespaces that contain network policies.
-func GatherNamespacesWithPolicies() ([]string, error) {
-	clientset, err := GetClientset()
-	if err != nil {
-		return nil, err
-	}
-
+func GatherNamespacesWithPolicies(clientset kubernetes.Interface) ([]string, error) {
 	// Retrieve all namespaces
 	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -126,8 +123,8 @@ func GatherNamespacesWithPolicies() ([]string, error) {
 }
 
 // gatherClusterVisualizationData retrieves visualization data for all namespaces with network policies.
-func GatherClusterVisualizationData() ([]VisualizationData, error) {
-	namespacesWithPolicies, err := GatherNamespacesWithPolicies()
+func GatherClusterVisualizationData(clientset kubernetes.Interface) ([]VisualizationData, error) {
+	namespacesWithPolicies, err := GatherNamespacesWithPolicies(clientset)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +133,7 @@ func GatherClusterVisualizationData() ([]VisualizationData, error) {
 	var clusterVizData []VisualizationData
 
 	for _, namespace := range namespacesWithPolicies {
-		vizData, err := gatherVisualizationData(namespace)
+		vizData, err := gatherVisualizationData(clientset, namespace)
 		if err != nil {
 			log.Printf("Error gathering visualization data for namespace %s: %v\n", namespace, err)
 			continue
@@ -163,7 +160,13 @@ func HandlePolicyYAMLRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve the network policy YAML
-	yaml, err := getNetworkPolicyYAML(namespace, policyName)
+	clientset, err := GetClientset()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	yaml, err := getNetworkPolicyYAML(clientset, namespace, policyName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -174,12 +177,7 @@ func HandlePolicyYAMLRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // getNetworkPolicyYAML retrieves the YAML representation of a network policy, excluding annotations.
-func getNetworkPolicyYAML(namespace, policyName string) (string, error) {
-	clientset, err := GetClientset()
-	if err != nil {
-		return "", err
-	}
-
+func getNetworkPolicyYAML(clientset kubernetes.Interface, namespace string, policyName string) (string, error) {
 	// Get the specified network policy
 	networkPolicy, err := clientset.NetworkingV1().NetworkPolicies(namespace).Get(context.TODO(), policyName, metav1.GetOptions{})
 	if err != nil {
