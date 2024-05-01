@@ -74,6 +74,16 @@ func isNetworkError(err error) bool {
 	return false
 }
 
+// Initialize client
+func InitializeClient() (*kubernetes.Clientset, error) {
+	clientset, err := GetClientset()
+	if err != nil {
+		fmt.Printf("Error creating Kubernetes client: %s\n", err)
+		return nil, err
+	}
+	return clientset, nil
+}
+
 var hasStartedNativeScan bool = false
 
 // ScanNetworkPolicies scans namespaces for network policies
@@ -86,9 +96,8 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 
 	writer := bufio.NewWriter(&output)
 
-	clientset, err := GetClientset()
+	clientset, err := InitializeClient()
 	if err != nil {
-		fmt.Printf("Error creating Kubernetes client: %s\n", err)
 		return nil, err
 	}
 
