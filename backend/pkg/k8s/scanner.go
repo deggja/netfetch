@@ -84,6 +84,32 @@ func InitializeClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
+// Select which namespace to scan
+func SelectNamespaces(clientset *kubernetes.Clientset, specificNamespace string) ([]string, error) {
+	var namespaces []string
+	if specificNamespace != "" {
+		_, err := clientset.CoreV1().Namespaces().Get(context.TODO(), specificNamespace, metav1.GetOptions{})
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil, fmt.Errorf("namespace %s does not exist", specificNamespace)
+			}
+			return nil, err
+		}
+		namespaces = append(namespaces, specificNamespace)
+	} else {
+		nsList, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		for _, ns := range nsList.Items {
+			if !IsSystemNamespace(ns.Name) {
+				namespaces = append(namespaces, ns.Name)
+			}
+		}
+	}
+	return namespaces, nil
+}
+
 var hasStartedNativeScan bool = false
 
 // ScanNetworkPolicies scans namespaces for network policies
@@ -101,30 +127,9 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 		return nil, err
 	}
 
-	if specificNamespace != "" {
-		_, err := clientset.CoreV1().Namespaces().Get(context.TODO(), specificNamespace, metav1.GetOptions{})
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				return nil, fmt.Errorf("namespace %s does not exist", specificNamespace)
-			}
-			return nil, fmt.Errorf("error checking namespace %s: %s", specificNamespace, err)
-		}
-		namespacesToScan = append(namespacesToScan, specificNamespace)
-	} else {
-		allNamespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			if isNetworkError(err) {
-				fmt.Println("You are not connected to a Kubernetes cluster. Please connect to a cluster and re-run the command.")
-			} else {
-				fmt.Printf("Error listing namespaces: %s\n", err)
-			}
-			return nil, err
-		}
-		for _, ns := range allNamespaces.Items {
-			if !IsSystemNamespace(ns.Name) {
-				namespacesToScan = append(namespacesToScan, ns.Name)
-			}
-		}
+	namespacesToScan, err = SelectNamespaces(clientset, specificNamespace)
+	if err != nil {
+		return nil, err
 	}
 
 	missingPoliciesOrUncoveredPods := false
