@@ -93,13 +93,16 @@ func SelectNamespaces(clientset *kubernetes.Clientset, specificNamespace string)
 			if k8serrors.IsNotFound(err) {
 				return nil, fmt.Errorf("namespace %s does not exist", specificNamespace)
 			}
-			return nil, err
+			return nil, fmt.Errorf("error checking namespace %s: %w", specificNamespace, err)
 		}
 		namespaces = append(namespaces, specificNamespace)
 	} else {
 		nsList, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			return nil, err
+			if isNetworkError(err) {
+				return nil, fmt.Errorf("network error while listing namespaces, please check your connection to the Kubernetes cluster: %w", err)
+			}
+			return nil, fmt.Errorf("error listing namespaces: %w", err)
 		}
 		for _, ns := range nsList.Items {
 			if !IsSystemNamespace(ns.Name) {
