@@ -277,6 +277,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 	deniedNamespaces := []string{}
 
 	if isCLI && !hasStartedNativeScan {
+		fmt.Println("Policy type: Kubernetes")
 		hasStartedNativeScan = true
 	}
 
