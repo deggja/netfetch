@@ -172,6 +172,23 @@ func determineUnprotectedPods(clientset *kubernetes.Clientset, nsName string, co
 	return unprotectedPods, nil
 }
 
+// This function just displays unprotected pods without prompting for any actions
+func displayUnprotectedPods(nsName string, unprotectedPods []string, writer *bufio.Writer) {
+	if len(unprotectedPods) > 0 {
+		headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
+		styledHeaderText := HeaderStyle.Render(headerText)
+		printToBoth(writer, styledHeaderText+"\n")
+
+		podsInfo := make([][]string, len(unprotectedPods))
+		for i, podDetail := range unprotectedPods {
+			podsInfo[i] = strings.Fields(podDetail)
+		}
+
+		tableOutput := createPodsTable(podsInfo)
+		printToBoth(writer, tableOutput+"\n")
+	}
+}
+
 func handleCLIInteractions(nsName string, unprotectedPods []string, writer *bufio.Writer, scanResult *ScanResult) {
 	if len(unprotectedPods) > 0 {
 		// Header
@@ -215,13 +232,16 @@ func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, wr
 		return fmt.Errorf("determining unprotected pods failed for namespace %s: %w", nsName, err)
 	}
 
+	// Always add pods to result for visibility
 	scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPods...)
-	if len(unprotectedPods) > 0 {
-		scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
-		if isCLI && !dryRun {
-			// Handling CLI interactions
-			handleCLIInteractions(nsName, unprotectedPods, writer, scanResult)
-		}
+	scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
+
+	// Only handle CLI interactions if it's a CLI mode and not a dry run
+	if isCLI && !dryRun {
+		handleCLIInteractions(nsName, unprotectedPods, writer, scanResult)
+	} else if dryRun {
+		// If it's a dry run, we just display the data without prompting for any actions
+		displayUnprotectedPods(nsName, unprotectedPods, writer)
 	}
 
 	return nil
