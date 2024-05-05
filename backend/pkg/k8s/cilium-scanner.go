@@ -132,6 +132,27 @@ func GetCiliumDynamicClient() (dynamic.Interface, error) {
 	return dynamicClient, nil
 }
 
+// initializeCiliumClients creates and returns initialized dynamic and Kubernetes clientsets.
+func initializeCiliumClients() (dynamic.Interface, *kubernetes.Clientset, error) {
+	dynamicClient, err := GetCiliumDynamicClient()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating dynamic Kubernetes client: %s", err)
+	}
+	if dynamicClient == nil {
+		return nil, nil, fmt.Errorf("failed to create dynamic client: client is nil")
+	}
+
+	clientset, err := GetClientset()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating Kubernetes clientset: %s", err)
+	}
+	if clientset == nil {
+		return nil, nil, fmt.Errorf("failed to create clientset: clientset is nil")
+	}
+
+	return dynamicClient, clientset, nil
+}
+
 var hasStartedCiliumScan bool = false
 var globallyProtectedPods = make(map[string]struct{})
 
@@ -145,26 +166,10 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 
 	writer := bufio.NewWriter(&output)
 
-	dynamicClient, err := GetCiliumDynamicClient()
+	dynamicClient, clientset, err := initializeCiliumClients()
 	if err != nil {
-		fmt.Printf("Error creating dynamic Kubernetes client: %s\n", err)
+		fmt.Println(err)
 		return nil, err
-	}
-
-	if dynamicClient == nil {
-		fmt.Println("Failed to create dynamic client: client is nil")
-		return nil, fmt.Errorf("failed to create dynamic client: client is nil")
-	}
-
-	clientset, err := GetClientset()
-	if err != nil {
-		fmt.Printf("Error creating Kubernetes clientset: %s\n", err)
-		return nil, err
-	}
-
-	if clientset == nil {
-		fmt.Println("Failed to create clientset: clientset is nil")
-		return nil, fmt.Errorf("failed to create clientset: clientset is nil")
 	}
 
 	ciliumNPResource := schema.GroupVersionResource{
@@ -298,7 +303,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 				// If CLI mode, interact with the user
 				if isCLI {
 					tableOutput := createPodsTable(unprotectedPodDetails)
-					headerText := fmt.Sprintf(" Unprotected pods found in namespace %s:", nsName)
+					headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
 					styledHeaderText := HeaderStyle.Render(headerText)
 					printToBoth(writer, styledHeaderText+"\n")
 					printToBoth(writer, tableOutput+"\n")
