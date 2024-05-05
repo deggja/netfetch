@@ -284,27 +284,12 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 			fmt.Printf("Error processing namespace %s: %v\n", nsName, err)
 			continue
 		}
+		unprotectedPodsCount += len(scanResult.UnprotectedPods)
 	}
 
 	writer.Flush()
 	if output.Len() > 0 {
-		saveToFile := false
-		prompt := &survey.Confirm{
-			Message: "Do you want to save the output to netfetch.txt?",
-		}
-		survey.AskOne(prompt, &saveToFile, nil)
-
-		if saveToFile {
-			err := os.WriteFile("netfetch.txt", output.Bytes(), 0644)
-			if err != nil {
-				errorFileMsg := fmt.Sprintf("Error writing to file: %s\n", err)
-				printToBoth(writer, errorFileMsg)
-			} else {
-				printToBoth(writer, "Output file created: netfetch.txt\n")
-			}
-		} else {
-			printToBoth(writer, "Output file not created.\n")
-		}
+		handleOutputAndPrompts(writer, &output)
 	}
 
 	score := CalculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
@@ -337,6 +322,27 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 
 	hasStartedNativeScan = false
 	return scanResult, nil
+}
+
+// handleOutputAndPrompts manages saving scan results to a file and outputting
+func handleOutputAndPrompts(writer *bufio.Writer, output *bytes.Buffer) {
+	saveToFile := false
+	prompt := &survey.Confirm{
+		Message: "Do you want to save the output to netfetch.txt?",
+	}
+	survey.AskOne(prompt, &saveToFile, nil)
+
+	if saveToFile {
+		err := os.WriteFile("netfetch.txt", output.Bytes(), 0644)
+		if err != nil {
+			errorFileMsg := fmt.Sprintf("Error writing to file: %s\n", err)
+			printToBoth(writer, errorFileMsg)
+		} else {
+			printToBoth(writer, "Output file created: netfetch.txt\n")
+		}
+	} else {
+		printToBoth(writer, "Output file not created.\n")
+	}
 }
 
 // Function to create the implicit default deny if missing
