@@ -288,6 +288,11 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 			continue
 		}
 		unprotectedPodsCount += len(scanResult.UnprotectedPods)
+
+		// Check if namespace is already marked as denied
+		if !contains(deniedNamespaces, nsName) {
+			deniedNamespaces = append(deniedNamespaces, nsName)
+		}
 	}
 
 	writer.Flush()
