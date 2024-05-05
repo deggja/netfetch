@@ -155,7 +155,7 @@ func fetchCoveredPods(clientset *kubernetes.Clientset, nsName string, writer *bu
 }
 
 // Fetches all pods in a namespace and determines which are unprotected
-func determineUnprotectedPods(clientset *kubernetes.Clientset, nsName string, coveredPods map[string]bool, writer *bufio.Writer) ([]string, error) {
+func determineUnprotectedPods(clientset *kubernetes.Clientset, nsName string, coveredPods map[string]bool, writer *bufio.Writer, scanResult *ScanResult) ([]string, error) {
 	unprotectedPods := []string{}
 	allPods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -166,7 +166,9 @@ func determineUnprotectedPods(clientset *kubernetes.Clientset, nsName string, co
 	for _, pod := range allPods.Items {
 		if !coveredPods[pod.Name] {
 			podDetail := fmt.Sprintf("%s %s %s", nsName, pod.Name, pod.Status.PodIP)
-			unprotectedPods = append(unprotectedPods, podDetail)
+			if !containsPodDetail(scanResult.UnprotectedPods, podDetail) {
+				unprotectedPods = append(unprotectedPods, podDetail)
+			}
 		}
 	}
 	return unprotectedPods, nil
@@ -227,7 +229,7 @@ func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, wr
 	}
 
 	// Determine unprotected pods
-	unprotectedPods, err := determineUnprotectedPods(clientset, nsName, coveredPods, writer)
+	unprotectedPods, err := determineUnprotectedPods(clientset, nsName, coveredPods, writer, scanResult)
 	if err != nil {
 		return fmt.Errorf("determining unprotected pods failed for namespace %s: %w", nsName, err)
 	}
