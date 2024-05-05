@@ -559,12 +559,14 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 
 	// Check each pod to see if it's protected by the policies
 	for _, pod := range pods.Items {
-		if IsPodProtected(writer, clientset, pod, unstructuredPolicies, defaultDenyAllExists, globallyProtectedPods) {
-			podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
-			globallyProtectedPods[podIdentifier] = struct{}{}
-		} else {
-			unprotectedPods := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
-			scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPods)
+		if !IsSystemNamespace(pod.Namespace) {
+			if IsPodProtected(writer, clientset, pod, unstructuredPolicies, defaultDenyAllExists, globallyProtectedPods) {
+				podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+				globallyProtectedPods[podIdentifier] = struct{}{}
+			} else {
+				unprotectedPods := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+				scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPods)
+			}
 		}
 	}
 
