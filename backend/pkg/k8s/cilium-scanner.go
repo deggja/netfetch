@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -153,6 +152,113 @@ func initializeCiliumClients() (dynamic.Interface, *kubernetes.Clientset, error)
 	return dynamicClient, clientset, nil
 }
 
+// fetchCiliumPolicies fetches all Cilium network policies within the specified namespace.
+func fetchCiliumPolicies(dynamicClient dynamic.Interface, nsName string, writer *bufio.Writer) ([]*unstructured.Unstructured, bool, error) {
+	ciliumNPResource := schema.GroupVersionResource{
+		Group:    "cilium.io",
+		Version:  "v2",
+		Resource: "ciliumnetworkpolicies",
+	}
+	policies, err := dynamicClient.Resource(ciliumNPResource).Namespace(nsName).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		printToBoth(writer, fmt.Sprintf("Error listing Cilium network policies in namespace %s: %s\n", nsName, err))
+		return nil, false, fmt.Errorf("error listing Cilium network policies: %w", err)
+	}
+
+	var unstructuredPolicies []*unstructured.Unstructured
+	hasDenyAll := false
+	for i := range policies.Items {
+		policy := &policies.Items[i]
+		unstructuredPolicies = append(unstructuredPolicies, policy)
+		if IsDefaultDenyAllCiliumPolicy(*policy) {
+			hasDenyAll = true
+		}
+	}
+
+	return unstructuredPolicies, hasDenyAll, nil
+}
+
+// determinePodCoverage identifies unprotected pods in a namespace based on the fetched Cilium policies.
+func determinePodCoverage(clientset *kubernetes.Clientset, nsName string, policies []*unstructured.Unstructured, hasDenyAll bool, writer *bufio.Writer, scanResult *ScanResult) ([]string, error) {
+	unprotectedPods := []string{}
+
+	pods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		printToBoth(writer, fmt.Sprintf("Error listing all pods in namespace %s: %s\n", nsName, err))
+		return nil, fmt.Errorf("error listing all pods: %w", err)
+	}
+
+	for _, pod := range pods.Items {
+		podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+		if _, exists := globallyProtectedPods[podIdentifier]; !exists {
+			if !IsPodProtected(writer, clientset, pod, policies, hasDenyAll, globallyProtectedPods) {
+				unprotectedPodDetails := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
+				unprotectedPods = append(unprotectedPods, unprotectedPodDetails)
+				scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails)
+			} else {
+				globallyProtectedPods[podIdentifier] = struct{}{} // Mark the pod as protected globally
+			}
+		}
+	}
+
+	return unprotectedPods, nil
+}
+
+// processNamespacePoliciesCilium processes Cilium network policies for a given namespace to identify unprotected pods.
+func processNamespacePoliciesCilium(dynamicClient dynamic.Interface, clientset *kubernetes.Clientset, nsName string, writer *bufio.Writer, scanResult *ScanResult, isCLI bool, dryRun bool) error {
+	ciliumPolicies, hasDenyAll, err := fetchCiliumPolicies(dynamicClient, nsName, writer)
+	if err != nil {
+		return err
+	}
+
+	unprotectedPods, err := determinePodCoverage(clientset, nsName, ciliumPolicies, hasDenyAll, writer, scanResult)
+	if err != nil {
+		return err
+	}
+
+	// Convert unprotectedPods from []string to [][]string for handleCLIInteractionsCilium
+	unprotectedPodDetails := make([][]string, len(unprotectedPods))
+	for i, pod := range unprotectedPods {
+		unprotectedPodDetails[i] = strings.Fields(pod)
+	}
+
+	// Handle CLI interactions or display unprotected pods accordingly
+	if isCLI && !dryRun {
+		handleCLIInteractionsCilium(nsName, unprotectedPodDetails, dynamicClient, writer, scanResult, dryRun)
+	} else {
+		displayUnprotectedPods(nsName, unprotectedPods, writer)
+	}
+
+	return nil
+}
+
+func handleCLIInteractionsCilium(nsName string, unprotectedPodDetails [][]string, dynamicClient dynamic.Interface, writer *bufio.Writer, scanResult *ScanResult, dryRun bool) {
+	tableOutput := createPodsTable(unprotectedPodDetails)
+	headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
+	styledHeaderText := HeaderStyle.Render(headerText)
+	printToBoth(writer, styledHeaderText+"\n"+tableOutput+"\n")
+
+	if !dryRun {
+		confirm := false
+		prompt := &survey.Confirm{
+			Message: fmt.Sprintf("Do you want to add a default deny all Cilium network policy to the namespace %s?", nsName),
+		}
+		survey.AskOne(prompt, &confirm, nil)
+
+		if confirm {
+			err := CreateAndApplyDefaultDenyCiliumPolicy(nsName, dynamicClient)
+			if err != nil {
+				fmt.Printf("Failed to apply default deny Cilium policy in namespace %s: %s\n", nsName, err)
+			} else {
+				fmt.Printf("Applied default deny Cilium policy in namespace %s\n", nsName)
+				scanResult.PolicyChangesMade = true
+			}
+		} else {
+			scanResult.UserDeniedPolicies = true
+		}
+	}
+}
+
 var hasStartedCiliumScan bool = false
 var globallyProtectedPods = make(map[string]struct{})
 
@@ -170,12 +276,6 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
-	}
-
-	ciliumNPResource := schema.GroupVersionResource{
-		Group:    "cilium.io",
-		Version:  "v2",
-		Resource: "ciliumnetworkpolicies",
 	}
 
 	// Check if a specific namespace is provided
@@ -212,130 +312,13 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 		hasStartedCiliumScan = true
 	}
 
+	// Process each namespace for policies and unprotected pods
 	for _, nsName := range namespacesToScan {
-		policies, err := dynamicClient.Resource(ciliumNPResource).Namespace(nsName).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			errorMsg := fmt.Sprintf("\nError listing Cilium network policies in namespace %s: %s\n", nsName, err)
-			printToBoth(writer, errorMsg)
-			return nil, errors.New(errorMsg)
+		scanResult.UnprotectedPods = []string{}
+		if err := processNamespacePoliciesCilium(dynamicClient, clientset, nsName, writer, scanResult, dryRun, isCLI); err != nil {
+			return nil, err
 		}
-
-		var unstructuredPolicies []*unstructured.Unstructured
-		for i := range policies.Items {
-			policy := &policies.Items[i]
-			unstructuredPolicies = append(unstructuredPolicies, policy)
-		}
-
-		hasDenyAll := HasDefaultDenyAllCiliumPolicy(unstructuredPolicies)
-		coveredPods := make(map[string]bool)
-
-		for _, policyUnstructured := range policies.Items {
-			if IsDefaultDenyAllCiliumPolicy(policyUnstructured) {
-				hasDenyAll = true
-			}
-			policyMap := policyUnstructured.UnstructuredContent()
-
-			spec, found := policyMap["spec"].(map[string]interface{})
-			if !found {
-				fmt.Fprintf(writer, "Error finding spec for policy %s in namespace %s\n", policyUnstructured.GetName(), nsName)
-				continue
-			}
-
-			endpointSelector, found := spec["endpointSelector"].(map[string]interface{})
-			if !found {
-				fmt.Fprintf(writer, "Error finding endpointSelector for policy %s in namespace %s\n", policyUnstructured.GetName(), nsName)
-				continue
-			}
-
-			labelSelector, err := ConvertEndpointToSelector(endpointSelector)
-			if err != nil {
-				fmt.Fprintf(writer, "Error converting endpoint selector to label selector for policy %s: %s\n", policyUnstructured.GetName(), err)
-				continue
-			}
-
-			pods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: labelSelector,
-			})
-			if err != nil {
-				fmt.Fprintf(writer, "Error listing pods for endpointSelector %s: %s\n", labelSelector, err)
-				continue
-			}
-
-			for _, pod := range pods.Items {
-				coveredPods[pod.Name] = true
-			}
-		}
-
-		if !hasDenyAll {
-			var unprotectedPodDetails [][]string
-			allPods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{})
-			if err != nil {
-				errorMsg := fmt.Sprintf("Error listing all pods in namespace %s: %s\n", nsName, err)
-				printToBoth(writer, errorMsg)
-				continue
-			}
-
-			for _, pod := range allPods.Items {
-				podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name) // Create a unique identifier for the pod
-
-				// Check if the pod is globally protected. If it is, skip it.
-				if _, protectedGlobally := globallyProtectedPods[podIdentifier]; !protectedGlobally {
-					// Check if the pod is protected by the policies. If it's protected, it'll also be added to globallyProtectedPods
-					if IsPodProtected(writer, clientset, pod, unstructuredPolicies, hasDenyAll, globallyProtectedPods) {
-						// [DEBUG] fmt.Printf("Pod %s/%s is now marked as globally protected\n", pod.Namespace, pod.Name)
-					} else {
-						// Handle unprotected pod
-						podDetail := []string{pod.Namespace, pod.Name, pod.Status.PodIP}
-						unprotectedPodDetails = append(unprotectedPodDetails, podDetail)
-						unprotectedPodsCount++
-					}
-				}
-			}
-
-			if len(unprotectedPodDetails) > 0 {
-				missingPoliciesOrUncoveredPods = true
-
-				// Flatten the details and append to scanResult.UnprotectedPods
-				for _, podDetail := range unprotectedPodDetails {
-					flattenedDetail := strings.Join(podDetail, " ")
-					scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, flattenedDetail)
-				}
-				// If CLI mode, interact with the user
-				if isCLI {
-					tableOutput := createPodsTable(unprotectedPodDetails)
-					headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
-					styledHeaderText := HeaderStyle.Render(headerText)
-					printToBoth(writer, styledHeaderText+"\n")
-					printToBoth(writer, tableOutput+"\n")
-					fmt.Printf("\n")
-
-					if !dryRun {
-						confirm := false
-						prompt := &survey.Confirm{
-							Message: fmt.Sprintf("Do you want to add a default deny all Cilium network policy to the namespace %s?", nsName),
-						}
-						survey.AskOne(prompt, &confirm, nil)
-						fmt.Printf("\n")
-
-						if confirm {
-							err := CreateAndApplyDefaultDenyCiliumPolicy(nsName, dynamicClient)
-							if err != nil {
-								fmt.Printf("\nFailed to apply default deny Cilium policy in namespace %s: %s\n", nsName, err)
-							} else {
-								fmt.Printf("\nApplied default deny Cilium policy in namespace %s\n", nsName)
-								policyChangesMade = true
-							}
-						} else {
-							userDeniedPolicyApplication = true
-							deniedNamespaces = append(deniedNamespaces, nsName)
-						}
-					}
-				} else {
-					// Non-CLI behavior
-					scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
-				}
-			}
-		}
+		unprotectedPodsCount += len(scanResult.UnprotectedPods)
 	}
 
 	writer.Flush()
@@ -395,7 +378,7 @@ func handlePrintMessagesCilium(writer *bufio.Writer, policyChangesMade bool, mis
 			printToBoth(writer, "\nNetfetch scan completed!\n")
 		}
 	} else {
-		printToBoth(writer, "\nNo cilium network policies missing. You are good to go!\n")
+		printToBoth(writer, "\nNo Cilium network policies missing. You are good to go!\n")
 	}
 }
 
@@ -460,7 +443,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	// Report the detected policies
 	if isCLI {
 		if len(policies.Items) == 0 {
-			printToBoth(writer, "No policies found.\n")
+			printToBoth(writer, "No cluster wide policies found.\n")
 		} else {
 			// printToBoth(writer, "[VERBOSE]: Found:\n")
 			for _, policy := range policies.Items {
