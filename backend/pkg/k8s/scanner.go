@@ -127,18 +127,15 @@ func promptForPolicyApplication(namespace string, writer *bufio.Writer) bool {
 	return confirm
 }
 
-// processNamespacePolicies manages the fetching of network policies for a given namespace,
-// checks for unprotected pods, and handles CLI interactions for applying policies if required.
-func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, writer *bufio.Writer, isCLI bool, dryRun bool, scanResult *ScanResult) error {
+// Fetches all network policies for a namespace and returns a map of covered pods
+func fetchCoveredPods(clientset *kubernetes.Clientset, nsName string, writer *bufio.Writer) (map[string]bool, error) {
+	coveredPods := make(map[string]bool)
 	policies, err := clientset.NetworkingV1().NetworkPolicies(nsName).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		errorMsg := fmt.Sprintf("\nError listing network policies in namespace %s: %s\n", nsName, err)
-		printToBoth(writer, errorMsg)
-		return fmt.Errorf("error listing network policies: %w", err)
+		printToBoth(writer, fmt.Sprintf("\nError listing network policies in namespace %s: %s\n", nsName, err))
+		return nil, fmt.Errorf("error listing network policies: %w", err)
 	}
 
-	coveredPods := make(map[string]bool)
-	unprotectedPodDetailsForTable := [][]string{}
 	for _, policy := range policies.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&policy.Spec.PodSelector)
 		if err != nil {
@@ -154,38 +151,76 @@ func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, wr
 			coveredPods[pod.Name] = true
 		}
 	}
+	return coveredPods, nil
+}
 
+// Fetches all pods in a namespace and determines which are unprotected
+func determineUnprotectedPods(clientset *kubernetes.Clientset, nsName string, coveredPods map[string]bool, writer *bufio.Writer) ([]string, error) {
+	unprotectedPods := []string{}
 	allPods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		printToBoth(writer, fmt.Sprintf("Error listing all pods in namespace %s: %s\n", nsName, err))
-		return fmt.Errorf("error listing all pods: %w", err)
+		return nil, fmt.Errorf("error listing all pods: %w", err)
 	}
 
 	for _, pod := range allPods.Items {
 		if !coveredPods[pod.Name] {
-			podDetail := []string{nsName, pod.Name, pod.Status.PodIP}
-			flatDetail := strings.Join(podDetail, " ") // Flatten the pod details into a single string
-			scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, flatDetail)
+			podDetail := fmt.Sprintf("%s %s %s", nsName, pod.Name, pod.Status.PodIP)
+			unprotectedPods = append(unprotectedPods, podDetail)
 		}
 	}
+	return unprotectedPods, nil
+}
 
-	if len(scanResult.UnprotectedPods) > 0 {
+func handleCLIInteractions(nsName string, unprotectedPods []string, writer *bufio.Writer, scanResult *ScanResult) {
+	if len(unprotectedPods) > 0 {
+		// Header
+		headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
+		styledHeaderText := HeaderStyle.Render(headerText)
+		printToBoth(writer, styledHeaderText+"\n")
+
+		// Prepare data for table
+		podsInfo := make([][]string, len(unprotectedPods))
+		for i, podDetail := range unprotectedPods {
+			podsInfo[i] = strings.Fields(podDetail)
+		}
+
+		// Create and print table
+		tableOutput := createPodsTable(podsInfo)
+		printToBoth(writer, tableOutput+"\n")
+
+		// Prompt for applying policies
+		if promptForPolicyApplication(nsName, writer) {
+			err := createAndApplyDefaultDenyPolicy(nsName)
+			if err != nil {
+				fmt.Fprintf(writer, "Failed to apply default deny policy in namespace %s: %s\n", nsName, err)
+			} else {
+				fmt.Fprintf(writer, "Applied default deny policy in namespace %s\n", nsName)
+				scanResult.PolicyChangesMade = true
+			}
+		}
+	}
+}
+
+func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, writer *bufio.Writer, isCLI bool, dryRun bool, scanResult *ScanResult) error {
+	// Fetch covered pods
+	coveredPods, err := fetchCoveredPods(clientset, nsName, writer)
+	if err != nil {
+		return fmt.Errorf("fetching covered pods failed for namespace %s: %w", nsName, err)
+	}
+
+	// Determine unprotected pods
+	unprotectedPods, err := determineUnprotectedPods(clientset, nsName, coveredPods, writer)
+	if err != nil {
+		return fmt.Errorf("determining unprotected pods failed for namespace %s: %w", nsName, err)
+	}
+
+	scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPods...)
+	if len(unprotectedPods) > 0 {
 		scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
 		if isCLI && !dryRun {
-			tableOutput := createPodsTable(unprotectedPodDetailsForTable)
-			headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
-			styledHeaderText := HeaderStyle.Render(headerText)
-			printToBoth(writer, styledHeaderText+"\n"+tableOutput+"\n")
-
-			if promptForPolicyApplication(nsName, writer) {
-				err = createAndApplyDefaultDenyPolicy(nsName)
-				if err != nil {
-					fmt.Fprintf(writer, "Failed to apply default deny policy in namespace %s: %s\n", nsName, err)
-				} else {
-					fmt.Fprintf(writer, "Applied default deny policy in namespace %s\n", nsName)
-					scanResult.PolicyChangesMade = true
-				}
-			}
+			// Handling CLI interactions
+			handleCLIInteractions(nsName, unprotectedPods, writer, scanResult)
 		}
 	}
 
