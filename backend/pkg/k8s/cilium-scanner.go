@@ -335,46 +335,14 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 
 	writer.Flush()
 	if output.Len() > 0 {
-		saveToFile := false
-		prompt := &survey.Confirm{
-			Message: "Do you want to save the output to netfetch-cilium.txt?",
-		}
-		survey.AskOne(prompt, &saveToFile, nil)
-
-		if saveToFile {
-			err := os.WriteFile("netfetch-cilium.txt", output.Bytes(), 0644)
-			if err != nil {
-				errorFileMsg := fmt.Sprintf("Error writing to file: %s\n", err)
-				printToBoth(writer, errorFileMsg)
-			} else {
-				printToBoth(writer, "Output file created: netfetch-cilium.txt\n")
-			}
-		} else {
-			printToBoth(writer, "Output file not created.\n")
-		}
+		handleOutputAndPromptsCilium(writer, &output)
 	}
 
 	score := CalculateScore(!missingPoliciesOrUncoveredPods, !userDeniedPolicyApplication, unprotectedPodsCount)
 	scanResult.Score = score
 
 	if printMessages {
-		if policyChangesMade {
-			fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
-		}
-
-		if missingPoliciesOrUncoveredPods {
-			if userDeniedPolicyApplication {
-				printToBoth(writer, "\nFor the following namespaces, you should assess the need of implementing network policies:\n")
-				for _, ns := range deniedNamespaces {
-					fmt.Println(" -", ns)
-				}
-				printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a cilium network policy. Check the Cilium documentation for more information on cilium network policies: https://docs.cilium.io/en/latest/security/policy/\n")
-			} else {
-				printToBoth(writer, "\nNetfetch scan completed!\n")
-			}
-		} else {
-			printToBoth(writer, "\nNo cilium network policies missing. You are good to go!\n")
-		}
+		handlePrintMessagesCilium(writer, policyChangesMade, missingPoliciesOrUncoveredPods, userDeniedPolicyApplication, deniedNamespaces)
 	}
 
 	if printScore {
@@ -384,6 +352,46 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 
 	hasStartedCiliumScan = false
 	return scanResult, nil
+}
+
+func handleOutputAndPromptsCilium(writer *bufio.Writer, output *bytes.Buffer) {
+	saveToFile := false
+	prompt := &survey.Confirm{
+		Message: "Do you want to save the output to netfetch-cilium.txt?",
+	}
+	survey.AskOne(prompt, &saveToFile, nil)
+
+	if saveToFile {
+		err := os.WriteFile("netfetch-cilium.txt", output.Bytes(), 0644)
+		if err != nil {
+			errorFileMsg := fmt.Sprintf("Error writing to file: %s\n", err)
+			printToBoth(writer, errorFileMsg)
+		} else {
+			printToBoth(writer, "Output file created: netfetch-cilium.txt\n")
+		}
+	} else {
+		printToBoth(writer, "Output file not created.\n")
+	}
+}
+
+func handlePrintMessagesCilium(writer *bufio.Writer, policyChangesMade bool, missingPoliciesOrUncoveredPods bool, userDeniedPolicyApplication bool, deniedNamespaces []string) {
+	if policyChangesMade {
+		fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
+	}
+
+	if missingPoliciesOrUncoveredPods {
+		if userDeniedPolicyApplication {
+			printToBoth(writer, "\nFor the following namespaces, you should assess the need of implementing network policies:\n")
+			for _, ns := range deniedNamespaces {
+				fmt.Println(" -", ns)
+			}
+			printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a cilium network policy. Check the Cilium documentation for more information on cilium network policies: https://docs.cilium.io/en/latest/security/policy/\n")
+		} else {
+			printToBoth(writer, "\nNetfetch scan completed!\n")
+		}
+	} else {
+		printToBoth(writer, "\nNo cilium network policies missing. You are good to go!\n")
+	}
 }
 
 // ScanCiliumClusterwideNetworkPolicies scans the cluster for Cilium Clusterwide Network Policies
