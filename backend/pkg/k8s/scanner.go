@@ -273,7 +273,6 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 
 	missingPoliciesOrUncoveredPods := false
 	userDeniedPolicyApplication := false
-	policyChangesMade := false
 	deniedNamespaces := []string{}
 
 	if isCLI && !hasStartedNativeScan {
@@ -304,7 +303,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 	scanResult.Score = score
 
 	if printMessages {
-		handlePrintMessages(writer, policyChangesMade, missingPoliciesOrUncoveredPods, userDeniedPolicyApplication, deniedNamespaces)
+		printToBoth(writer, "\nNetfetch scan completed!\n")
 	}
 
 	if printScore {
@@ -334,27 +333,6 @@ func handleOutputAndPrompts(writer *bufio.Writer, output *bytes.Buffer) {
 		}
 	} else {
 		printToBoth(writer, "Output file not created.\n")
-	}
-}
-
-// handlePrintMessages prints messages based on the scan results
-func handlePrintMessages(writer *bufio.Writer, policyChangesMade bool, missingPoliciesOrUncoveredPods bool, userDeniedPolicyApplication bool, deniedNamespaces []string) {
-	if policyChangesMade {
-		fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
-	}
-
-	if missingPoliciesOrUncoveredPods {
-		if userDeniedPolicyApplication {
-			printToBoth(writer, "\nFor the following namespaces, you should assess the need of implementing network policies:\n")
-			for _, ns := range deniedNamespaces {
-				fmt.Println(" -", ns)
-			}
-			printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a network policy. Check the Kubernetes documentation for more information on network policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/\n")
-		} else {
-			printToBoth(writer, "\nNetfetch scan completed!\n")
-		}
-	} else {
-		printToBoth(writer, "\nNo network policies missing. You are good to go!\n")
 	}
 }
 
@@ -416,12 +394,8 @@ func IsSystemNamespace(namespace string) bool {
 func CalculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int) int {
 	score := 42 // Start with the highest score
 
-	if !hasPolicies {
-		score -= 20
-	}
-
 	// Deduct score based on the number of unprotected pods
-	score -= unprotectedPodsCount
+	score -= 2 * unprotectedPodsCount
 
 	if score < 1 {
 		score = 1 // Minimum score
