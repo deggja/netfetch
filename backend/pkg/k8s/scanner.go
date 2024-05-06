@@ -394,8 +394,12 @@ func IsSystemNamespace(namespace string) bool {
 func CalculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int) int {
 	score := 42 // Start with the highest score
 
+	if !hasPolicies {
+		score -= 20
+	}
+
 	// Deduct score based on the number of unprotected pods
-	score -= 2 * unprotectedPodsCount
+	score -= unprotectedPodsCount
 
 	if score < 1 {
 		score = 1 // Minimum score
