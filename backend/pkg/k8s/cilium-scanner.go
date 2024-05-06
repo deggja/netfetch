@@ -379,6 +379,48 @@ func handleOutputAndPromptsCilium(writer *bufio.Writer, output *bytes.Buffer) {
 	}
 }
 
+// fetchCiliumClusterwidePolicies retrieves all Cilium Clusterwide Network Policies using a dynamic client
+func fetchCiliumClusterwidePolicies(dynamicClient dynamic.Interface) ([]*unstructured.Unstructured, error) {
+	ciliumCCNPResource := schema.GroupVersionResource{
+		Group:    "cilium.io",
+		Version:  "v2",
+		Resource: "ciliumclusterwidenetworkpolicies",
+	}
+
+	policies, err := dynamicClient.Resource(ciliumCCNPResource).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing CiliumClusterwideNetworkPolicies: %v", err)
+	}
+
+	var unstructuredPolicies []*unstructured.Unstructured
+	policyMap := make(map[string]bool)
+
+	for i := range policies.Items {
+		policy := policies.Items[i]
+		policyName := policy.GetName()
+		if _, exists := policyMap[policyName]; !exists {
+			policyMap[policyName] = true
+			unstructuredPolicies = append(unstructuredPolicies, &policy)
+		}
+	}
+
+	return unstructuredPolicies, nil
+}
+
+// reportDetectedPolicies prints the detected policies to the writer
+func reportDetectedPolicies(unstructuredPolicies []*unstructured.Unstructured, writer *bufio.Writer, isCLI bool) {
+	if isCLI {
+		if len(unstructuredPolicies) == 0 {
+			printToBoth(writer, "No cluster wide policies found.\n")
+		} else {
+			for _, policy := range unstructuredPolicies {
+				policyName, _, _ := unstructured.NestedString(policy.UnstructuredContent(), "metadata", "name")
+				printToBoth(writer, "- "+policyName+"\n")
+			}
+		}
+	}
+}
+
 // ScanCiliumClusterwideNetworkPolicies scans the cluster for Cilium Clusterwide Network Policies
 func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, printMessages bool, dryRun bool, isCLI bool) (*ScanResult, error) {
 	// Buffer and writer setup to capture output for both console and file.
@@ -403,34 +445,10 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		return nil, fmt.Errorf("failed to create clientset: clientset is nil")
 	}
 
-	// Define the resource for Cilium Clusterwide Network Policies
-	ciliumCCNPResource := schema.GroupVersionResource{
-		Group:    "cilium.io",
-		Version:  "v2",
-		Resource: "ciliumclusterwidenetworkpolicies",
-	}
-
-	// Fetch the policies from the cluster
-	policies, err := dynamicClient.Resource(ciliumCCNPResource).List(context.Background(), metav1.ListOptions{})
+	unstructuredPolicies, err := fetchCiliumClusterwidePolicies(dynamicClient)
 	if err != nil {
-		printToBoth(writer, fmt.Sprintf("Error listing CiliumClusterwideNetworkPolicies: %s\n", err))
-		return nil, fmt.Errorf("error listing CiliumClusterwideNetworkPolicies: %v", err)
-	}
-
-	// Deduplicate policies by storing them in a map to check for uniqueness
-	policyMap := make(map[string]bool)
-	var unstructuredPolicies []*unstructured.Unstructured
-
-	for i := range policies.Items {
-		policy := policies.Items[i]
-		policyName := policy.GetName()
-
-		// Check if the policy has already been added to the map (and thus the list)
-		if _, exists := policyMap[policyName]; !exists {
-			// If it doesn't exist, add it to the map and the list
-			policyMap[policyName] = true
-			unstructuredPolicies = append(unstructuredPolicies, &policies.Items[i]) // Reference directly from the original slice
-		}
+		printToBoth(writer, fmt.Sprintf("Error fetching Cilium Clusterwide Network Policies: %s\n", err))
+		return nil, err
 	}
 
 	if isCLI && !hasStartedCiliumScan {
@@ -438,17 +456,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	}
 
 	// Report the detected policies
-	if isCLI {
-		if len(policies.Items) == 0 {
-			printToBoth(writer, "No cluster wide policies found.\n")
-		} else {
-			// printToBoth(writer, "[VERBOSE]: Found:\n")
-			for _, policy := range policies.Items {
-				policyName, _, _ := unstructured.NestedString(policy.UnstructuredContent(), "metadata", "name")
-				printToBoth(writer, "- "+policyName+"\n")
-			}
-		}
-	}
+	reportDetectedPolicies(unstructuredPolicies, writer, isCLI)
 
 	// Initialize the scan result
 	scanResult := &ScanResult{
@@ -467,8 +475,8 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 	var partialDenyAllPolicies []string // To hold names of policies that don't apply to the entire cluster
 
 	// Iterate through each policy to determine its type
-	for _, policy := range policies.Items {
-		isDenyAll, isClusterWide := IsDefaultDenyAllCiliumClusterwidePolicy(policy)
+	for _, policy := range unstructuredPolicies {
+		isDenyAll, isClusterWide := IsDefaultDenyAllCiliumClusterwidePolicy(*policy)
 		if isDenyAll {
 			defaultDenyAllFound = true
 			if isClusterWide {
