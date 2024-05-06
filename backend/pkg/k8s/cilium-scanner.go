@@ -319,8 +319,6 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 
 	missingPoliciesOrUncoveredPods := false
 	userDeniedPolicyApplication := false
-	policyChangesMade := false
-	deniedNamespaces := []string{}
 
 	if isCLI && !hasStartedCiliumScan {
 		fmt.Println("Policy type: Cilium")
@@ -349,7 +347,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 	scanResult.Score = score
 
 	if printMessages {
-		handlePrintMessagesCilium(writer, missingPoliciesOrUncoveredPods, userDeniedPolicyApplication, policyChangesMade, deniedNamespaces)
+		printToBoth(writer, "\nNetfetch scan completed!\n")
 	}
 
 	if printScore {
@@ -378,26 +376,6 @@ func handleOutputAndPromptsCilium(writer *bufio.Writer, output *bytes.Buffer) {
 		}
 	} else {
 		printToBoth(writer, "Output file not created.\n")
-	}
-}
-
-func handlePrintMessagesCilium(writer *bufio.Writer, missingPoliciesOrUncoveredPods bool, userDeniedPolicyApplication bool, policyChangesMade bool, deniedNamespaces []string) {
-	if policyChangesMade {
-		fmt.Println("\nChanges were made during this scan. It's recommended to re-run the scan for an updated score.")
-	}
-
-	if missingPoliciesOrUncoveredPods {
-		if userDeniedPolicyApplication {
-			printToBoth(writer, "\nFor the following namespaces, you should assess the need of implementing network policies:\n")
-			for _, ns := range deniedNamespaces {
-				printToBoth(writer, fmt.Sprintf(" - %s\n", ns))
-			}
-			printToBoth(writer, "\nConsider either an implicit default deny all network policy or a policy that targets the pods not selected by a cilium network policy. Check the Cilium documentation for more information on cilium network policies: https://docs.cilium.io/en/latest/security/policy/\n")
-		} else {
-			printToBoth(writer, "\nNetfetch scan completed!\n")
-		}
-	} else {
-		printToBoth(writer, "\nNo Cilium network policies missing. You are good to go!\n")
 	}
 }
 
