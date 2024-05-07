@@ -611,75 +611,60 @@ func handleOutputAndPromptsClusterwideCilium(writer *bufio.Writer, output *bytes
 	}
 }
 
+func isProtectedByDefaultDeny(policy *unstructured.Unstructured, globallyProtectedPods map[string]struct{}, podIdentifier string) bool {
+	_, appliesToEntireCluster := IsDefaultDenyAllCiliumClusterwidePolicy(*policy)
+	if appliesToEntireCluster {
+		globallyProtectedPods[podIdentifier] = struct{}{}
+		return true
+	}
+	return false
+}
+
+func isProtectedByLabelMatch(policies []*unstructured.Unstructured, pod corev1.Pod, globallyProtectedPods map[string]struct{}, podIdentifier string) bool {
+	for _, policy := range policies {
+		endpointSelector, _, _ := unstructured.NestedMap(policy.UnstructuredContent(), "endpointSelector", "matchLabels")
+		if MatchesLabels(pod.Labels, endpointSelector) {
+			ingress, foundIngress, _ := unstructured.NestedSlice(policy.UnstructuredContent(), "ingress")
+			egress, foundEgress, _ := unstructured.NestedSlice(policy.UnstructuredContent(), "egress")
+
+			// Check for deny-all conditions based on empty ingress/egress
+			if (foundIngress && (IsEmptyOrOnlyContainsEmptyObjects(ingress) || IsSpecificallyEmpty(ingress))) ||
+				(foundEgress && (IsEmptyOrOnlyContainsEmptyObjects(egress) || IsSpecificallyEmpty(egress))) {
+				globallyProtectedPods[podIdentifier] = struct{}{}
+				return true
+			}
+
+			// Additional check for non-empty specific rules
+			if foundIngress && !IsEmptyOrOnlyContainsEmptyObjects(ingress) || foundEgress && !IsEmptyOrOnlyContainsEmptyObjects(egress) {
+				globallyProtectedPods[podIdentifier] = struct{}{}
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func IsPodProtected(writer *bufio.Writer, clientset *kubernetes.Clientset, pod corev1.Pod, policies []*unstructured.Unstructured, defaultDenyAllExists bool, globallyProtectedPods map[string]struct{}) bool {
 	podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+
+	// Immediate return if already protected
 	if _, protected := globallyProtectedPods[podIdentifier]; protected {
 		return true
 	}
 
+	// Apply default deny-all if it exists
 	if defaultDenyAllExists {
 		globallyProtectedPods[podIdentifier] = struct{}{}
 		return true
 	}
 
-	// Loop through policies to find any that apply namespace-wide.
+	// Check each policy for default deny or label match
 	for _, policy := range policies {
-		policyName := policy.GetName()
-
-		spec, found := policy.UnstructuredContent()["spec"].(map[string]interface{})
-		if !found {
-			printToBoth(writer, fmt.Sprintf("No spec found in policy %s\n", policyName))
-			continue
-		}
-
-		endpointSelector, found, err := unstructured.NestedMap(spec, "endpointSelector", "matchLabels")
-		if err != nil {
-			printToBoth(writer, fmt.Sprintf("Error reading endpointSelector from policy %s: %v\n", policy.GetName(), err))
-			continue
-		}
-		if !found || len(endpointSelector) == 0 {
-			continue
-		}
-
-		// Check if the policy applies to the entire namespace.
-		if val, ok := endpointSelector["io.kubernetes.pod.namespace"]; ok && val == pod.Namespace {
-			globallyProtectedPods[podIdentifier] = struct{}{}
+		if isProtectedByDefaultDeny(policy, globallyProtectedPods, podIdentifier) {
 			return true
 		}
-	}
-
-	for _, policy := range policies {
-		policyName := policy.GetName()
-
-		spec, found := policy.UnstructuredContent()["spec"].(map[string]interface{})
-		if !found {
-			printToBoth(writer, fmt.Sprintf("No spec found in policy %s\n", policyName))
-			continue
-		}
-
-		endpointSelector, _, _ := unstructured.NestedMap(spec, "endpointSelector", "matchLabels")
-		isDenyAll, appliesToEntireCluster := IsDefaultDenyAllCiliumClusterwidePolicy(*policy)
-
-		if isDenyAll && appliesToEntireCluster {
-			globallyProtectedPods[podIdentifier] = struct{}{}
+		if isProtectedByLabelMatch(policies, pod, globallyProtectedPods, podIdentifier) {
 			return true
-		}
-
-		if MatchesLabels(pod.Labels, endpointSelector) {
-			ingress, foundIngress, _ := unstructured.NestedSlice(spec, "ingress")
-			egress, foundEgress, _ := unstructured.NestedSlice(spec, "egress")
-
-			// Existing checks for empty ingress/egress and deny-all
-			if (foundIngress && (IsEmptyOrOnlyContainsEmptyObjects(ingress) || IsSpecificallyEmpty(ingress))) || (foundEgress && (IsEmptyOrOnlyContainsEmptyObjects(egress) || IsSpecificallyEmpty(egress))) || isDenyAll {
-				globallyProtectedPods[podIdentifier] = struct{}{}
-				return true
-			}
-
-			// New check for specific ingress or egress rules
-			if foundIngress && !IsEmptyOrOnlyContainsEmptyObjects(ingress) || foundEgress && !IsEmptyOrOnlyContainsEmptyObjects(egress) {
-				globallyProtectedPods[podIdentifier] = struct{}{}
-				return true
-			}
 		}
 	}
 
