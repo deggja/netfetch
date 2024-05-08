@@ -239,7 +239,7 @@ func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, wr
 	scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPods...)
 	scanResult.DeniedNamespaces = append(scanResult.DeniedNamespaces, nsName)
 
-	// Only handle CLI interactions if it's a CLI mode and not a dry run
+	// Only handle CLI interactions if it's CLI mode and not a dry run
 	if isCLI && !dryRun {
 		handleCLIInteractions(nsName, unprotectedPods, writer, scanResult)
 	} else if dryRun {
