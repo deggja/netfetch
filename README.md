@@ -199,7 +199,7 @@ brew untap deggja/netfetch https://github.com/deggja/netfetch
 
 ## Running Tests
 
-To run tests for this project, follow these steps:
+To run tests for netfetch, follow these steps:
 
 1. Navigate to the root directory of the project in your terminal.
 
