@@ -222,9 +222,11 @@ This command will recursively search for tests in all subdirectories (./...) and
 ## Contribute 🔨
 Thank you to the following awesome people:
 
+- [roopeshsn](https://github.com/roopeshsn) - writing tests
 - [s-rd](https://github.com/s-rd) - logo
 - [JJGadgets](https://github.com/JJGadgets) - testing
 - [Home Operations Discord](https://github.com/onedr0p/home-ops) - testing
+
 
 You are welcome to contribute!
 

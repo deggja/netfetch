@@ -1,6 +1,7 @@
 # .goreleaser.yml
 project_name: netfetch
 
+# Changelog Configuration
 changelog:
   sort: desc
   filters:
@@ -17,8 +18,10 @@ changelog:
       regexp: "^fix:"
     - title: "Documentation Updates"
       regexp: "^docs:"
+    - title: "Other Changes"
+      regexp: ".*"  # Matches everything that doesn't fit above groups
 
-# Build configuration
+# Build Configuration
 builds:
   - id: "netfetch"
     main: ./backend/main.go
@@ -34,7 +37,7 @@ builds:
       - -s -w -X 'github.com/deggja/netfetch/backend/cmd.Version={{.Version}}'
     # Additional build flags can be added here
 
-# Archive configuration
+# Archive Configuration
 archives:
   - id: "archive"
     builds:
@@ -43,7 +46,7 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     wrap_in_directory: true
 
-# Release configuration
+# Release Configuration
 release:
   github:
     owner: deggja
