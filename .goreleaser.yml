@@ -7,18 +7,16 @@ changelog:
   filters:
     exclude:
       - '^Merge pull request'
-      - '^chore:'
-      - '^refactor:'
-      - '^style:'
-      - '^test:'
   groups:
     - title: "Features"
       regexp: "^feat:"
     - title: "Bug Fixes"
-      regexp: "^fix:"
+      regexp: "^(fix|bugfix):"
     - title: "Documentation Updates"
       regexp: "^docs:"
     - title: "Other Changes"
+      regexp: "^(ci|build|misc|perf|deps):"
+    - title: "Miscellaneous"
       regexp: ".*"  # Matches everything that doesn't fit above groups
 
 # Build Configuration
