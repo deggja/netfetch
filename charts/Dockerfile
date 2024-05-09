@@ -1,5 +1,5 @@
 # Stage 1: Build the Vue.js frontend
-FROM node:latest as nodebuilder
+FROM node:21 as nodebuilder
 
 WORKDIR /app/frontend
 
