@@ -49,6 +49,19 @@ var scanCmd = &cobra.Command{
 					fmt.Println("Error during Kubernetes native network policy search:", err)
 				} else {
 					fmt.Printf("Found Kubernetes native network policy '%s' in namespace '%s'.\n", policy.GetName(), foundNamespace)
+
+					// List the pods targeted by this policy
+					pods, err := k8s.ListPodsTargetedByNetworkPolicy(dynamicClient, policy, foundNamespace)
+					if err != nil {
+						fmt.Printf("Error listing pods targeted by policy %s: %v\n", policy.GetName(), err)
+					} else if len(pods) == 0 {
+						fmt.Printf("No pods targeted by policy '%s' in namespace '%s'.\n", policy.GetName(), foundNamespace)
+					} else {
+						fmt.Printf("Pods targeted by policy '%s' in namespace '%s':\n", policy.GetName(), foundNamespace)
+						for _, pod := range pods {
+							fmt.Printf("  - %s\n", pod)
+						}
+					}
 				}
 				return
 			}
