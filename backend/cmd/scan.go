@@ -43,6 +43,7 @@ var scanCmd = &cobra.Command{
 		// Handle target policy for native Kubernetes network policies
 		if targetPolicy != "" {
 			if !cilium || native {
+				fmt.Println("Policy type: Kubernetes")
 				fmt.Printf("Searching for Kubernetes native network policy '%s' across all non-system namespaces...\n", targetPolicy)
 				policy, foundNamespace, err := k8s.FindNativeNetworkPolicyByName(dynamicClient, clientset, targetPolicy)
 				if err != nil {
