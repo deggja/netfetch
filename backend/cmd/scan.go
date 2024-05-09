@@ -8,10 +8,11 @@ import (
 )
 
 var (
-	dryRun  bool
-	native  bool
-	cilium  bool
-	verbose bool
+	dryRun       bool
+	native       bool
+	cilium       bool
+	verbose      bool
+	targetPolicy string
 )
 
 var scanCmd = &cobra.Command{
@@ -19,12 +20,38 @@ var scanCmd = &cobra.Command{
 	Short: "Scan Kubernetes namespaces for network policies",
 	Long: `Scan Kubernetes namespaces for network policies.
     By default, it scans for native Kubernetes network policies.
-    Use --cilium to scan for Cilium network policies.`,
+    Use --cilium to scan for Cilium network policies. You may also target a speecific network policy using --target-policy.`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var namespace string
 		if len(args) > 0 {
 			namespace = args[0]
+		}
+
+		// Initialize the Kubernetes clients
+		clientset, err := k8s.GetClientset()
+		if err != nil {
+			fmt.Println("Error creating Kubernetes client:", err)
+			return
+		}
+		dynamicClient, err := k8s.GetCiliumDynamicClient()
+		if err != nil {
+			fmt.Println("Error creating Kubernetes dynamic client:", err)
+			return
+		}
+
+		// Handle target policy for native Kubernetes network policies
+		if targetPolicy != "" {
+			if !cilium || native {
+				fmt.Printf("Searching for Kubernetes native network policy '%s' across all non-system namespaces...\n", targetPolicy)
+				policy, foundNamespace, err := k8s.FindNativeNetworkPolicyByName(dynamicClient, clientset, targetPolicy)
+				if err != nil {
+					fmt.Println("Error during Kubernetes native network policy search:", err)
+				} else {
+					fmt.Printf("Found Kubernetes native network policy '%s' in namespace '%s'.\n", policy.GetName(), foundNamespace)
+				}
+				return
+			}
 		}
 
 		// Default to native scan if no specific type is mentioned or if --native is used
@@ -83,6 +110,7 @@ func init() {
 	scanCmd.Flags().BoolVarP(&dryRun, "dryrun", "d", false, "Perform a dry run without applying any changes")
 	scanCmd.Flags().BoolVar(&native, "native", false, "Scan only native network policies")
 	scanCmd.Flags().BoolVar(&cilium, "cilium", false, "Scan only Cilium network policies (includes cluster-wide policies if no namespace is specified)")
+	scanCmd.Flags().StringVarP(&targetPolicy, "target", "t", "", "Scan a specific network policy by name")
 	scanCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 	rootCmd.AddCommand(scanCmd)
 }
