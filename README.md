@@ -155,6 +155,12 @@ Launch the dashboard:
 netfetch dash
 ```
 
+You may also specify a port for the dashboard to run on (default is 8080).
+
+```sh
+netfetch dash --port 8081
+```
+
 While in the dashboard, you have a couple of options.
 
 You can use the `Scan cluster` button, which is the equivalent to the CLI `netfetch scan` command. This will populate the table view with all pods not targeted by a network policy.
