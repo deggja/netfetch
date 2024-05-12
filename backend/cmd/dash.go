@@ -22,12 +22,15 @@ var dashCmd = &cobra.Command{
 	Use:   "dash",
 	Short: "Launch the Netfetch interactive dashboard",
 	Run: func(cmd *cobra.Command, args []string) {
-		startDashboardServer()
+		port, _ := cmd.Flags().GetString("port")
+		startDashboardServer(port)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(dashCmd)
+
+	dashCmd.Flags().StringP("port", "p", "8080", "Port for the interactive dashboard")
 }
 
 func setNoCacheHeaders(w http.ResponseWriter) {
@@ -36,7 +39,7 @@ func setNoCacheHeaders(w http.ResponseWriter) {
 	w.Header().Set("Expires", "0")
 }
 
-func startDashboardServer() {
+func startDashboardServer(port string) {
 	// Verify connection to cluster or throw error
 	clientset, err := k8s.GetClientset()
 	if err != nil {
@@ -54,7 +57,7 @@ func startDashboardServer() {
 		AllowOriginRequestFunc: func(r *http.Request, origin string) bool {
 			// Implement your dynamic origin check here
 			host := r.Host // Extract the host from the request
-			allowedOrigins := []string{"http://localhost:8081", "https://" + host}
+			allowedOrigins := []string{"http://localhost:" + port, "https://" + host}
 			for _, allowedOrigin := range allowedOrigins {
 				if origin == allowedOrigin {
 					return true
@@ -84,7 +87,6 @@ func startDashboardServer() {
 	handler := c.Handler(http.DefaultServeMux)
 
 	// Start the server
-	port := "8080"
 	serverURL := fmt.Sprintf("http://localhost:%s", port)
 	startupMessage := HeaderStyle.Render(fmt.Sprintf("Starting dashboard server on %s", serverURL))
 	fmt.Println(startupMessage)
@@ -193,7 +195,6 @@ func handleClusterVisualizationRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 
 	clientset, err := k8s.GetClientset()
 	if err != nil {
