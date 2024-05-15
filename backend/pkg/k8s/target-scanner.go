@@ -55,10 +55,10 @@ func FindCiliumNetworkPolicyByName(dynamicClient dynamic.Interface, policyName s
             return policy, namespace, nil
         }
     }
-    return nil, "", fmt.Errorf("Cilium network policy %s not found in any non-system namespace", policyName)
+    return nil, "", fmt.Errorf("cilium network policy %s not found in any non-system namespace", policyName)
 }
 
-// FindCiliumClusterWideNetworkPolicyByName searches for a specific cluster-wide Cilium network policy by name.
+// FindCiliumClusterWideNetworkPolicyByName searches for a specific cluster wide Cilium network policy by name.
 func FindCiliumClusterWideNetworkPolicyByName(dynamicClient dynamic.Interface, policyName string) (*unstructured.Unstructured, error) {
     gvr := schema.GroupVersionResource{
         Group:    "cilium.io",
@@ -68,7 +68,7 @@ func FindCiliumClusterWideNetworkPolicyByName(dynamicClient dynamic.Interface, p
 
     policy, err := dynamicClient.Resource(gvr).Get(context.TODO(), policyName, v1.GetOptions{})
     if err != nil {
-        return nil, fmt.Errorf("Cilium cluster-wide network policy %s not found", policyName)
+        return nil, fmt.Errorf("cilium cluster wide network policy %s not found", policyName)
     }
     return policy, nil
 }
@@ -164,12 +164,12 @@ func ListPodsTargetedByCiliumNetworkPolicy(dynamicClient dynamic.Interface, poli
     return targetedPods, nil
 }
 
-// ListPodsTargetedByCiliumClusterWideNetworkPolicy lists all pods targeted by the given Cilium cluster-wide network policy.
+// ListPodsTargetedByCiliumClusterWideNetworkPolicy lists all pods targeted by the given Cilium cluster wide network policy.
 func ListPodsTargetedByCiliumClusterWideNetworkPolicy(dynamicClient dynamic.Interface, policy *unstructured.Unstructured) ([]string, error) {
 	// Retrieve the PodSelector (matchLabels)
 	podSelector, found, err := unstructured.NestedMap(policy.Object, "spec", "endpointSelector", "matchLabels")
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve pod selector from Cilium cluster-wide network policy %s: %v", policy.GetName(), err)
+		return nil, fmt.Errorf("failed to retrieve pod selector from Cilium cluster wide network policy %s: %v", policy.GetName(), err)
 	}
 
 	// Regex for valid Kubernetes label keys
