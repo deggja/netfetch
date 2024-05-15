@@ -68,6 +68,52 @@ var scanCmd = &cobra.Command{
 			}
 		}
 
+		// Handle target policy for Cilium network policies and cluster-wide policies
+        if targetPolicy != "" && cilium {
+            fmt.Println("Policy type: Cilium")
+            fmt.Printf("Searching for Cilium network policy '%s' across all non-system namespaces...\n", targetPolicy)
+            policy, foundNamespace, err := k8s.FindCiliumNetworkPolicyByName(dynamicClient, targetPolicy)
+            if err != nil {
+                // If not found in namespaces, search for cluster-wide policy
+                fmt.Println("Cilium network policy not found in namespaces, searching for cluster-wide policy...")
+                policy, err = k8s.FindCiliumClusterWideNetworkPolicyByName(dynamicClient, targetPolicy)
+                if err != nil {
+                    fmt.Println("Error during Cilium cluster-wide network policy search:", err)
+                } else {
+                    fmt.Printf("Found Cilium cluster-wide network policy '%s'.\n", policy.GetName())
+
+                    // List the pods targeted by this cluster-wide policy
+                    pods, err := k8s.ListPodsTargetedByCiliumClusterWideNetworkPolicy(dynamicClient, policy)
+                    if err != nil {
+                        fmt.Printf("Error listing pods targeted by cluster-wide policy %s: %v\n", policy.GetName(), err)
+                    } else if len(pods) == 0 {
+                        fmt.Printf("No pods targeted by cluster-wide policy '%s'.\n", policy.GetName())
+                    } else {
+                        fmt.Printf("Pods targeted by cluster-wide policy '%s':\n", policy.GetName())
+                        for _, pod := range pods {
+                            fmt.Printf("  - %s\n", pod)
+                        }
+                    }
+                }
+            } else {
+                fmt.Printf("Found Cilium network policy '%s' in namespace '%s'.\n", policy.GetName(), foundNamespace)
+
+                // List the pods targeted by this policy
+                pods, err := k8s.ListPodsTargetedByCiliumNetworkPolicy(dynamicClient, policy, foundNamespace)
+                if err != nil {
+                    fmt.Printf("Error listing pods targeted by policy %s: %v\n", policy.GetName(), err)
+                } else if len(pods) == 0 {
+                    fmt.Printf("No pods targeted by policy '%s' in namespace '%s'.\n", policy.GetName(), foundNamespace)
+                } else {
+                    fmt.Printf("Pods targeted by policy '%s' in namespace '%s':\n", policy.GetName(), foundNamespace)
+                    for _, pod := range pods {
+                        fmt.Printf("  - %s\n", pod)
+                    }
+                }
+            }
+            return
+        }
+
 		// Default to native scan if no specific type is mentioned or if --native is used
 		if !cilium || native {
 			fmt.Println("Running native network policies scan...")
