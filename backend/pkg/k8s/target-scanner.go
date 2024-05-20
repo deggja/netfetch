@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -82,7 +81,7 @@ func GetAllNonSystemNamespaces(dynamicClient dynamic.Interface) ([]string, error
 		Resource: "namespaces",
 	}
 
-	namespacesList, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
+	namespacesList, err := dynamicClient.Resource(gvr).List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error listing namespaces: %v", err)
 	}
@@ -97,7 +96,7 @@ func GetAllNonSystemNamespaces(dynamicClient dynamic.Interface) ([]string, error
 }
 
 // ListPodsTargetedByNetworkPolicy lists all pods targeted by the given network policy in the specified namespace.
-func ListPodsTargetedByNetworkPolicy(dynamicClient dynamic.Interface, policy *unstructured.Unstructured, namespace string) ([]string, error) {
+func ListPodsTargetedByNetworkPolicy(dynamicClient dynamic.Interface, policy *unstructured.Unstructured, namespace string) ([][]string, error) {
 	// Retrieve the PodSelector (matchLabels)
 	podSelector, found, err := unstructured.NestedMap(policy.Object, "spec", "podSelector", "matchLabels")
 	if err != nil {
@@ -117,21 +116,25 @@ func ListPodsTargetedByNetworkPolicy(dynamicClient dynamic.Interface, policy *un
 	}
 
 	// Fetch pods based on the selector
-	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.AsSelectorPreValidated().String()})
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), v1.ListOptions{LabelSelector: selector.AsSelectorPreValidated().String()})
 	if err != nil {
 		return nil, fmt.Errorf("error listing pods in namespace %s: %v", namespace, err)
 	}
 
-	var targetedPods []string
-	for _, pod := range pods.Items {
-		targetedPods = append(targetedPods, pod.Name)
-	}
+	var targetedPods [][]string
+    for _, pod := range pods.Items {
+        podDetails := []string{namespace, pod.Name, pod.Status.PodIP}
+        if pod.Status.PodIP == "" {
+            podDetails[2] = "N/A"
+        }
+        targetedPods = append(targetedPods, podDetails)
+    }
 
 	return targetedPods, nil
 }
 
 // ListPodsTargetedByCiliumNetworkPolicy lists all pods targeted by the given Cilium network policy in the specified namespace.
-func ListPodsTargetedByCiliumNetworkPolicy(dynamicClient dynamic.Interface, policy *unstructured.Unstructured, namespace string) ([]string, error) {
+func ListPodsTargetedByCiliumNetworkPolicy(dynamicClient dynamic.Interface, policy *unstructured.Unstructured, namespace string) ([][]string, error) {
     // Retrieve the PodSelector (matchLabels)
     podSelector, found, err := unstructured.NestedMap(policy.Object, "spec", "endpointSelector", "matchLabels")
     if err != nil {
@@ -151,21 +154,21 @@ func ListPodsTargetedByCiliumNetworkPolicy(dynamicClient dynamic.Interface, poli
     }
 
     // Fetch pods based on the selector
-    pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.AsSelectorPreValidated().String()})
+    pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), v1.ListOptions{LabelSelector: selector.AsSelectorPreValidated().String()})
     if err != nil {
         return nil, fmt.Errorf("error listing pods in namespace %s: %v", namespace, err)
     }
 
-    var targetedPods []string
+    var targetedPods [][]string
     for _, pod := range pods.Items {
-        targetedPods = append(targetedPods, pod.Name)
+        targetedPods = append(targetedPods, []string{namespace, pod.Name, pod.Status.PodIP})
     }
 
     return targetedPods, nil
 }
 
 // ListPodsTargetedByCiliumClusterWideNetworkPolicy lists all pods targeted by the given Cilium cluster wide network policy.
-func ListPodsTargetedByCiliumClusterWideNetworkPolicy(dynamicClient dynamic.Interface, policy *unstructured.Unstructured) ([]string, error) {
+func ListPodsTargetedByCiliumClusterWideNetworkPolicy(dynamicClient dynamic.Interface, policy *unstructured.Unstructured) ([][]string, error) {
 	// Retrieve the PodSelector (matchLabels)
 	podSelector, found, err := unstructured.NestedMap(policy.Object, "spec", "endpointSelector", "matchLabels")
 	if err != nil {
@@ -193,15 +196,15 @@ func ListPodsTargetedByCiliumClusterWideNetworkPolicy(dynamicClient dynamic.Inte
 	}
 
 	// Fetch pods based on the selector
-	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{LabelSelector: selector.AsSelectorPreValidated().String()})
+	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), v1.ListOptions{LabelSelector: selector.AsSelectorPreValidated().String()})
 	if err != nil {
 		return nil, fmt.Errorf("error listing pods: %v", err)
 	}
 
-	var targetedPods []string
-	for _, pod := range pods.Items {
-		targetedPods = append(targetedPods, pod.Name)
-	}
+	var targetedPods [][]string
+    for _, pod := range pods.Items {
+        targetedPods = append(targetedPods, []string{"", pod.Name, pod.Status.PodIP})
+    }
 
 	return targetedPods, nil
 }
