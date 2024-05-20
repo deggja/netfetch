@@ -165,70 +165,33 @@ func handleScanResult(scanResult *k8s.ScanResult) {
 }
 
 var (
-	EvenRowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-	OddRowStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Align(lipgloss.Center)
+    evenRowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+    oddRowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+    tableBorderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
 )
 
 // Function to create a table for pods
-func createTargetPodsTable(pods []string, namespace string) string {
-	podsInfo := [][]string{}
-	for _, pod := range pods {
-		podsInfo = append(podsInfo, []string{namespace, pod, "N/A"})
-	}
+func createTargetPodsTable(pods [][]string, namespace string) string {
+    t := table.New().
+        Border(lipgloss.NormalBorder()).
+        BorderStyle(tableBorderStyle).
+        StyleFunc(func(row, col int) lipgloss.Style {
+            if row == 0 {
+                return headerStyle
+            }
+            if row%2 == 0 {
+                return evenRowStyle
+            }
+            return oddRowStyle
+        }).
+        Headers("Namespace", "Pod Name", "IP Address")
 
-	t := table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			switch {
-			case row == 0:
-				return HeaderStyle
-			case row%2 == 0:
-				return EvenRowStyle
-			default:
-				return OddRowStyle
-			}
-		}).
-		Headers("Namespace", "Pod Name", "IP Address")
+    for _, podDetails := range pods {
+        t.Row(podDetails...)
+    }
 
-	for _, row := range podsInfo {
-		formattedRow := make([]string, 3)
-		for i := 0; i < 3; i++ {
-			if i < len(row) {
-				formattedRow[i] = row[i]
-			} else {
-				formattedRow[i] = "N/A"
-			}
-		}
-
-		t.Row(formattedRow[0], formattedRow[1], formattedRow[2])
-	}
-
-	return t.String()
-}
-
-// Function to create a table for policies
-func createTargetPoliciesTable(policiesInfo [][]string) string {
-	t := table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			switch {
-			case row == 0:
-				return HeaderStyle
-			case row%2 == 0:
-				return EvenRowStyle
-			default:
-				return OddRowStyle
-			}
-		}).
-		Headers("Policy Name")
-
-	for _, row := range policiesInfo {
-		t.Row(row...)
-	}
-
-	return t.String()
+    return t.String()
 }
 
 func init() {
