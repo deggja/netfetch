@@ -40,32 +40,24 @@
 
 This project aims to demystify network policies in Kubernetes. It's a work in progress!
 
-The `netfetch` tool is designed to scan Kubernetes namespaces for network policies, checking if your workloads are targeted by a network policy or not.
+The `netfetch` tool will scan your Kubernetes cluster and let you know if you have any pods running without being targeted by network policies.
 
-What can I use `netfetch` for? 🤔
-
-CLI:
-- Scan your Kubernetes cluster or namespace to identify pods running with no ingress and egress restrictions.
-- Save the output of your scans in a text file to analyze.
-- Create implicit default deny network policies in namespaces that do not have one.
-- Get a score calculated for your cluster or namespace based on the findings of the scans.
-
-Dashboard:
-- Scan your cluster or namespace and list pods running without network restrictions in a table.
-- Visualise all existing network policies and pods in your cluster or namespace in a network map you can interact with.
-- Double click a network policy in a network map to preview the YAML of that policy.
-- Create implicit default deny network policies in namespaces that do not have one.
-- Get suggestions for network policies that you can edit & apply to your namespaces by analysing existing pods.
-- Get a score calculated for your cluster or namespace based on the findings of the scans.
+| Feature                                                                | CLI  | Dashboard |
+|------------------------------------------------------------------------|------|-----------|
+| Scan cluster identify pods without network policies                    | ✓    | ✓         |
+| Save scan output to a text file                                        | ✓    |           |
+| Visualize network policies and pods in a interactive network map       |      | ✓         |
+| Create default deny network policies where this is missing             | ✓    | ✓         |
+| Get suggestions for network policies based on existing workloads       |      | ✓         |
+| Calculate a security score based on scan findings                      | ✓    | ✓         |
+| Scan a specific policy by name to see what pods it  targets            | ✓    |           |
 
 ### NetworkPolicy type support in Netfetch
 
-Dashboard:
-* Kubernetes
-
-CLI:
-* Kubernetes
-* Cilium
+| Type      | CLI  | Dashboard |
+|-----------|------|-----------|
+| Kubernetes| ✓    | ✓         |
+| Cilium    | ✓    |           |
 
 Support for additional types of network policies is in the works. No support for the type you need? Check out [issues](https://github.com/deggja/netfetch/issues) for an existing request or create a new one if there is none.
 
@@ -118,7 +110,7 @@ netfetch scan --dryrun
 Run `netfetch` in dryrun against a namespace
 
 ```sh
-netfetch scan production --dryrun
+netfetch scan crossplane-system --dryrun
 ```
 
 ![netfetch-demo](https://github.com/deggja/netfetch/assets/15778492/015e9d9f-a678-4a14-a8bd-607f02c13d9f)
@@ -129,23 +121,37 @@ Scan entire cluster.
 netfetch scan
 ```
 
-Scan a namespace called production.
+Scan a namespace called crossplane-system.
 
 ```sh
-netfetch scan production
+netfetch scan crossplane-system
 ```
 
-Scan entire cluster for Cilium Network Policies.
+Scan entire cluster for Cilium Network Policies and or Cluster Wide Cilium Network Policies.
 
 ```sh
 netfetch scan --cilium
 ```
 
-Scan a namespace called production.
+Scan a namespace called production for regular Cilium Network Policies.
 
 ```sh
 netfetch scan production --cilium
 ```
+
+Scan a specific network policy.
+
+```sh
+netfetch scan --target my-policy-name
+```
+
+Scan a specific Cilium Network Policy.
+
+```sh
+netfetch scan --cilium --target default-cilium-default-deny-all
+```
+
+[![asciicast](https://asciinema.org/a/661200.svg)](https://asciinema.org/a/661200)
 
 ### Using the dashboard 📟
 
@@ -161,29 +167,24 @@ You may also specify a port for the dashboard to run on (default is 8080).
 netfetch dash --port 8081
 ```
 
-While in the dashboard, you have a couple of options.
+### Dashboard functionality overview
 
-You can use the `Scan cluster` button, which is the equivalent to the CLI `netfetch scan` command. This will populate the table view with all pods not targeted by a network policy.
+The Netfetch Dashboard offers an intuitive interface for interacting with your Kubernetes cluster's network policies. Below is a detailed overview of the functionalities available through the dashboard:
 
-Scanning a specific namespace is done by selecting the namespace of choice from the `Select a namespace` dropdown and using the `Scan namespace` button. This is the equivalent to the CLI `netfetch scan namespace` command. 
+| Action               | Description                                                                                                     | Screenshot Link                                                 |
+|----------------------|-----------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| Scan Cluster         | Initiates a cluster-wide scan to identify pods without network policies, similar to `netfetch scan`.            | ![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-dash.png) |
+| Scan Namespace       | Scans a selected namespace for pods not covered by network policies, equivalent to `netfetch scan namespace`.   | ![Cluster map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-clustermap.png) |
+| Create Cluster Map   | Generates a D3-rendered network map of all pods and policies across accessible namespaces.                      | ![Network map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-ns.png) |
+| Suggest Policy       | Provides network policy suggestions based on existing workloads within a selected namespace.                     | ![Suggested policies](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-suggestpolicy.png) |
 
-This will populate the table view with all pods not targeted by a network policy in that specific namespace. In addition to this, if there are any pods in the cluster already targeted by a network policy - it will create a visualisation of this in a network map rendered using [D3](https://d3-graph-gallery.com/network.html) below the table view.
+### Interactive Features
 
-![Netfetch Dashboard](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-dash.png)
+- **Table View**: Shows pods not targeted by network policies. It updates based on the cluster or namespace scans.
+- **Network Map Visualization**: Rendered using D3 to show how pods and policies interact within the cluster.
+- **Policy Preview**: Double-click network policy nodes within the network map to view policy YAML.
+- **Policy Editing**: Edit suggested policies directly within the dashboard or copy the YAML for external use.
 
-You can click the `Create cluster map` button to do exactly that. This will render a network map with D3, fetching all pods and policies in all the namespaces you have access to in the cluster.
-
-![Cluster map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-clustermap.png)
-
-Inside the network map visualisations, you can double click the network policy nodes to preview the YAML of that policy.
-
-![Network map](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-ns.png)
-
-When scanning a specific namespace using the `Select namespace` dropdown, you may click `Suggest policy` to get network policy suggestions based on your existing workloads.
-
-![Suggested policies](https://github.com/deggja/netfetch/blob/main/frontend/dash/src/assets/new-suggestpolicy.png)
-
-You may also edit the suggestions inline by using the "Edit" button or copy the YAML of the policy and use it outside of netfetch.
 
 ### Netfetch score 🥇
 
