@@ -85,7 +85,7 @@ var scanCmd = &cobra.Command{
                     fmt.Printf("Found Cilium clusterwide network policy '%s'.\n", policy.GetName())
 
                     // List the pods targeted by this cluster wide policy
-                    pods, err := k8s.ListPodsTargetedByCiliumClusterWideNetworkPolicy(dynamicClient, policy)
+                    pods, err := k8s.ListPodsTargetedByCiliumClusterWideNetworkPolicy(clientset, dynamicClient, policy)
                     if err != nil {
                         fmt.Printf("Error listing pods targeted by cluster wide policy %s: %v\n", policy.GetName(), err)
                     } else if len(pods) == 0 {

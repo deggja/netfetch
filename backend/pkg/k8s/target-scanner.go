@@ -168,44 +168,46 @@ func ListPodsTargetedByCiliumNetworkPolicy(dynamicClient dynamic.Interface, poli
 }
 
 // ListPodsTargetedByCiliumClusterWideNetworkPolicy lists all pods targeted by the given Cilium cluster wide network policy.
-func ListPodsTargetedByCiliumClusterWideNetworkPolicy(dynamicClient dynamic.Interface, policy *unstructured.Unstructured) ([][]string, error) {
-	// Retrieve the PodSelector (matchLabels)
-	podSelector, found, err := unstructured.NestedMap(policy.Object, "spec", "endpointSelector", "matchLabels")
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve pod selector from Cilium cluster wide network policy %s: %v", policy.GetName(), err)
-	}
-
-	// Regex for valid Kubernetes label keys
-	validLabelKey := regexp.MustCompile(`^[A-Za-z0-9][-A-Za-z0-9_.]*[A-Za-z0-9]$`)
-
-	// Check if the selector is empty
-	selector := make(labels.Set)
-	if found && len(podSelector) > 0 {
-		for key, value := range podSelector {
-			// Skip reserved labels
-			if !validLabelKey.MatchString(key) {
-				fmt.Printf("Skipping reserved label key %s in policy %s\n", key, policy.GetName())
-				continue
-			}
-			if strValue, ok := value.(string); ok {
-				selector[key] = strValue
-			} else {
-				return nil, fmt.Errorf("invalid type for selector value %v in policy %s", value, policy.GetName())
-			}
-		}
-	}
-
-	// Fetch pods based on the selector
-	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), v1.ListOptions{LabelSelector: selector.AsSelectorPreValidated().String()})
-	if err != nil {
-		return nil, fmt.Errorf("error listing pods: %v", err)
-	}
-
-	var targetedPods [][]string
-    for _, pod := range pods.Items {
-        targetedPods = append(targetedPods, []string{"", pod.Name, pod.Status.PodIP})
+func ListPodsTargetedByCiliumClusterWideNetworkPolicy(clientset *kubernetes.Clientset, dynamicClient dynamic.Interface, policy *unstructured.Unstructured) ([][]string, error) {
+    // Retrieve the PodSelector (matchLabels)
+    podSelector, found, err := unstructured.NestedMap(policy.Object, "spec", "endpointSelector", "matchLabels")
+    if err != nil {
+        return nil, fmt.Errorf("failed to retrieve pod selector from Cilium cluster wide network policy %s: %v", policy.GetName(), err)
     }
 
-	return targetedPods, nil
-}
+    // Regex for valid Kubernetes label keys
+    validLabelKey := regexp.MustCompile(`^[A-Za-z0-9][-A-Za-z0-9_.]*[A-Za-z0-9]$`)
 
+    // Check if the selector is empty
+    selector := labels.Set{}
+    if found && len(podSelector) > 0 {
+        for key, value := range podSelector {
+            // Skip reserved labels
+            if !validLabelKey.MatchString(key) {
+                fmt.Printf("Skipping reserved label key %s in policy %s\n", key, policy.GetName())
+                continue
+            }
+            if strValue, ok := value.(string); ok {
+                selector[key] = strValue
+            } else {
+                return nil, fmt.Errorf("invalid type for selector value %v in policy %s", value, policy.GetName())
+            }
+        }
+    }
+
+    // Fetch pods based on the selector across all namespaces
+    pods, err := clientset.CoreV1().Pods("").List(context.TODO(), v1.ListOptions{
+        LabelSelector: selector.AsSelector().String(),
+    })
+    if err != nil {
+        return nil, fmt.Errorf("error listing pods for cluster wide policy: %v", err)
+    }
+
+    var targetedPods [][]string
+    for _, pod := range pods.Items {
+        podDetails := []string{pod.Namespace, pod.Name, pod.Status.PodIP}
+        targetedPods = append(targetedPods, podDetails)
+    }
+
+    return targetedPods, nil
+}
