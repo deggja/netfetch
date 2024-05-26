@@ -33,16 +33,8 @@ jobs:
         run: |
           chmod +x .github/scripts/bump_version.sh
           .github/scripts/bump_version.sh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build Application
-        if: env.new_tag != ''
-        run: |
-          go build -ldflags "-X 'github.com/deggja/netfetch/backend/cmd.Version=${{ env.new_tag }}'" -o netfetch
 
       - name: Run GoReleaser
-        if: env.new_tag != ''
         uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
