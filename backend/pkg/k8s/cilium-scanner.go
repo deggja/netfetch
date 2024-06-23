@@ -189,6 +189,7 @@ func determinePodCoverage(clientset *kubernetes.Clientset, nsName string, polici
 	}
 
 	for _, pod := range pods.Items {
+		// Skip pods that are not in running state
 		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
