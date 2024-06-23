@@ -189,6 +189,10 @@ func determinePodCoverage(clientset *kubernetes.Clientset, nsName string, polici
 	}
 
 	for _, pod := range pods.Items {
+		// Skip pods that are not in running state
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
 		podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 		if _, exists := globallyProtectedPods[podIdentifier]; !exists {
 			if !IsPodProtected(writer, clientset, pod, policies, hasDenyAll, globallyProtectedPods) {

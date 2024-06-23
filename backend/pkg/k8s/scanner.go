@@ -165,6 +165,10 @@ func determineUnprotectedPods(clientset *kubernetes.Clientset, nsName string, co
 	}
 
 	for _, pod := range allPods.Items {
+		// Skip pods that are not in running state
+		if pod.Status.Phase != v1.PodRunning {
+			continue
+		}
 		if !coveredPods[pod.Name] {
 			podDetail := fmt.Sprintf("%s %s %s", nsName, pod.Name, pod.Status.PodIP)
 			if !containsPodDetail(scanResult.UnprotectedPods, podDetail) {
