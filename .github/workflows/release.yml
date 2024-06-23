@@ -1,6 +1,15 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'info'
+      environment:
+        description: 'Environment'
+        required: false
   push:
     branches:
       - main
