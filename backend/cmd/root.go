@@ -12,10 +12,7 @@ var Version string
 var rootCmd = &cobra.Command{
 	Use:   "netfetch",
 	Short: "Netfetch is a CLI tool for scanning Kubernetes clusters for network policies",
-	Long: `Netfetch is a CLI tool that scans Kubernetes clusters for network policies
-and evaluates them against best practices. It helps in ensuring that your
-cluster's network configurations adhere to security standards.
-`,
+	Long: `Netfetch is a CLI  tool for scanning clusters for network policies and identifying unprotected workloads.`,
 }
 
 var versionCmd = &cobra.Command{
