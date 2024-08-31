@@ -63,7 +63,7 @@ var scanCmd = &cobra.Command{
 						fmt.Printf("No pods targeted by policy '%s' in namespace '%s'.\n", policy.GetName(), foundNamespace)
 					} else {
 						fmt.Printf("Pods targeted by policy '%s' in namespace '%s':\n", policy.GetName(), foundNamespace)
-						fmt.Println(createTargetPodsTable(pods, foundNamespace))
+						fmt.Println(createTargetPodsTable(pods))
 					}
 				}
 				return
@@ -92,7 +92,7 @@ var scanCmd = &cobra.Command{
                         fmt.Printf("No pods targeted by cluster wide policy '%s'.\n", policy.GetName())
                     } else {
                         fmt.Printf("Pods targeted by cluster wide policy '%s':\n", policy.GetName())
-                        fmt.Println(createTargetPodsTable(pods, ""))
+                        fmt.Println(createTargetPodsTable(pods))
                     }
                 }
             } else {
@@ -106,7 +106,7 @@ var scanCmd = &cobra.Command{
                     fmt.Printf("No pods targeted by policy '%s' in namespace '%s'.\n", policy.GetName(), foundNamespace)
                 } else {
                     fmt.Printf("Pods targeted by policy '%s' in namespace '%s':\n", policy.GetName(), foundNamespace)
-                    fmt.Println(createTargetPodsTable(pods, foundNamespace))
+                    fmt.Println(createTargetPodsTable(pods))
                 }
             }
             return
@@ -173,7 +173,7 @@ var (
 )
 
 // Function to create a table for pods
-func createTargetPodsTable(pods [][]string, namespace string) string {
+func createTargetPodsTable(pods [][]string) string {
     t := table.New().
         Border(lipgloss.NormalBorder()).
         BorderStyle(tableBorderStyle).
