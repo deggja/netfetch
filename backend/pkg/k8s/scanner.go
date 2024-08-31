@@ -313,7 +313,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 
 	if printScore {
 		// Print the final score
-		fmt.Printf("\nYour Netfetch security score is: %d/42\n", score)
+		fmt.Printf("\nYour Netfetch security score is: %d/100\n", score)
 	}
 
 	hasStartedNativeScan = false
