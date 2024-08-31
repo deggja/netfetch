@@ -399,11 +399,11 @@ func IsSystemNamespace(namespace string) bool {
 func CalculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int) int {
     score := 50 // Start with a base score of 50
 
-    if hasDenyAll {
-        score += 20 // Add 20 points for having deny-all policies
-    } else if !hasPolicies {
-        score -= 20 // Subtract 20 points if there are no policies at all
-    }
+    // if hasDenyAll {
+    //     score += 20 // Add 20 points for having deny-all policies
+    // } else if !hasPolicies {
+    //     score -= 20 // Subtract 20 points if there are no policies at all
+    // }
 
     // Deduct score based on the number of unprotected pods
     score -= unprotectedPodsCount
