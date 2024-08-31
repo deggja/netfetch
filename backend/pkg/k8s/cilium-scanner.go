@@ -178,6 +178,16 @@ func fetchCiliumPolicies(dynamicClient dynamic.Interface, nsName string, writer 
 	return unstructuredPolicies, hasDenyAll, nil
 }
 
+// helper function to ensure pods are not added to list multiple times
+func addUniquePodDetail(podDetails []string, detail string) []string {
+    for _, d := range podDetails {
+        if d == detail {
+            return podDetails // pod already in the list.
+        }
+    }
+    return append(podDetails, detail) // add pod if its not in list
+}
+
 // determinePodCoverage identifies unprotected pods in a namespace based on the fetched Cilium policies.
 func determinePodCoverage(clientset *kubernetes.Clientset, nsName string, policies []*unstructured.Unstructured, hasDenyAll bool, writer *bufio.Writer, scanResult *ScanResult) ([]string, error) {
 	unprotectedPods := []string{}
@@ -194,16 +204,15 @@ func determinePodCoverage(clientset *kubernetes.Clientset, nsName string, polici
 			continue
 		}
 		podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
-		if _, exists := globallyProtectedPods[podIdentifier]; !exists {
-			if !IsPodProtected(writer, clientset, pod, policies, hasDenyAll, globallyProtectedPods) {
-				unprotectedPodDetails := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
-				unprotectedPods = append(unprotectedPods, unprotectedPodDetails)
-				scanResult.UnprotectedPods = append(scanResult.UnprotectedPods, unprotectedPodDetails)
-			} else {
-				globallyProtectedPods[podIdentifier] = struct{}{} // Mark the pod as protected globally
-			}
-		}
-	}
+        if _, exists := globallyProtectedPods[podIdentifier]; !exists {
+            if !IsPodProtected(writer, clientset, pod, policies, hasDenyAll, globallyProtectedPods) {
+                unprotectedPodDetails := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
+                unprotectedPods = addUniquePodDetail(unprotectedPods, unprotectedPodDetails)
+            } else {
+                globallyProtectedPods[podIdentifier] = struct{}{} // Mark the pod as protected globally
+            }
+        }
+    }
 
 	return unprotectedPods, nil
 }
@@ -563,7 +572,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		UserDeniedPolicies: false,
 		AllPodsProtected:   false,
 		HasDenyAll:         []string{},
-		Score:              0, // or some initial value
+		Score:              50, // or some initial value
 	}
 
 	defaultDenyAllFound, appliesToEntireCluster, partialDenyAllPolicies, partialDenyAllFound := analyzeClusterwidePolicies(unstructuredPolicies)
