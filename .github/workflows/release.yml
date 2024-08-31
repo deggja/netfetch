@@ -37,11 +37,11 @@ jobs:
           cd backend
           go mod tidy
 
-      # - name: Bump version and tag
-      #   id: bump_version
-      #   run: |
-      #     chmod +x .github/scripts/bump_version.sh
-      #     .github/scripts/bump_version.sh
+      - name: Bump version and tag
+        id: bump_version
+        run: |
+          chmod +x .github/scripts/bump_version.sh
+          .github/scripts/bump_version.sh
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
