@@ -189,7 +189,7 @@ func addUniquePodDetail(podDetails []string, detail string) []string {
 }
 
 // determinePodCoverage identifies unprotected pods in a namespace based on the fetched Cilium policies.
-func determinePodCoverage(clientset *kubernetes.Clientset, nsName string, policies []*unstructured.Unstructured, hasDenyAll bool, writer *bufio.Writer, scanResult *ScanResult) ([]string, error) {
+func determinePodCoverage(clientset *kubernetes.Clientset, nsName string, policies []*unstructured.Unstructured, hasDenyAll bool, writer *bufio.Writer) ([]string, error) {
 	unprotectedPods := []string{}
 
 	pods, err := clientset.CoreV1().Pods(nsName).List(context.TODO(), metav1.ListOptions{})
@@ -224,7 +224,7 @@ func processNamespacePoliciesCilium(dynamicClient dynamic.Interface, clientset *
 		return err
 	}
 
-	unprotectedPods, err := determinePodCoverage(clientset, nsName, ciliumPolicies, hasDenyAll, writer, scanResult)
+	unprotectedPods, err := determinePodCoverage(clientset, nsName, ciliumPolicies, hasDenyAll, writer)
 	if err != nil {
 		return err
 	}
