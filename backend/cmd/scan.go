@@ -149,6 +149,7 @@ var scanCmd = &cobra.Command{
 			}
 
 			// Proceed with normal Cilium network policy scan
+			fmt.Println("Running cilium network policies scan...")
 			ciliumScanResult, err := k8s.ScanCiliumNetworkPolicies(namespace, dryRun, false, true, true, true)
 			if err != nil {
 				fmt.Println("Error during Cilium network policies scan:", err)
