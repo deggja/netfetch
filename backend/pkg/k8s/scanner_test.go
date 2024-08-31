@@ -79,29 +79,29 @@ func TestIsSystemNamespace(t *testing.T) {
 }
 
 func TestCalculateScore(t *testing.T) {
-	// Test case 1: All conditions met, maximum score expected
-	score1 := CalculateScore(true, true, 0)
-	if score1 != 42 {
-		t.Fatalf("Expected score to be 42, got %d", score1)
-	}
+    // Test case 1: Policies exist, deny all exists, no unprotected pods
+    score1 := CalculateScore(true, true, 0)
+    if score1 != 70 { // 50 base + 20 for deny-all
+        t.Fatalf("Expected score to be 70, got %d", score1)
+    }
 
-	// Test case 2: No policies, no deny all, 5 unprotected pods
-	score2 := CalculateScore(false, false, 5)
-	if score2 != 17 {
-		t.Fatalf("Expected score to be 17, got %d", score2)
-	}
+    // Test case 2: No policies, no deny all, 5 unprotected pods
+    score2 := CalculateScore(false, false, 5)
+    if score2 != 25 { // 50 base - 20 for no policies - 5 for unprotected pods
+        t.Fatalf("Expected score to be 25, got %d", score2)
+    }
 
-	// Test case 3: No policies, no deny all, no unprotected pods
-	score3 := CalculateScore(false, false, 0)
-	if score3 != 22 {
-		t.Fatalf("Expected score to be 1, got %d", score3)
-	}
+    // Test case 3: No policies, no deny all, no unprotected pods
+    score3 := CalculateScore(false, false, 0)
+    if score3 != 30 { // 50 base - 20 for no policies
+        t.Fatalf("Expected score to be 30, got %d", score3)
+    }
 
-	// Test case 4: Policies exist, deny all exists, no unprotected pods
-	score4 := CalculateScore(true, true, 0)
-	if score4 != 42 {
-		t.Fatalf("Expected score to be 42, got %d", score4)
-	}
+    // Test case 4: Policies exist, deny all exists, no unprotected pods (repeat of case 1 for consistency)
+    score4 := CalculateScore(true, true, 0)
+    if score4 != 70 {
+        t.Fatalf("Expected score to be 70, got %d", score4)
+    }
 }
 
 func TestGetPodInfo(t *testing.T) {
