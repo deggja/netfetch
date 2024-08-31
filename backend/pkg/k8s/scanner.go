@@ -313,7 +313,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 
 	if printScore {
 		// Print the final score
-		fmt.Printf("\nYour Netfetch security score is: %d/42\n", score)
+		fmt.Printf("\nYour Netfetch security score is: %d/100\n", score)
 	}
 
 	hasStartedNativeScan = false
@@ -397,20 +397,24 @@ func IsSystemNamespace(namespace string) bool {
 
 // Scoring logic
 func CalculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int) int {
-	score := 42 // Start with the highest score
+    score := 50 // Start with a base score of 50
 
-	if !hasPolicies {
-		score -= 20
-	}
+    if hasDenyAll {
+        score += 20 // Add 20 points for having deny-all policies
+    } else if !hasPolicies {
+        score -= 20 // Subtract 20 points if there are no policies at all
+    }
 
-	// Deduct score based on the number of unprotected pods
-	score -= unprotectedPodsCount
+    // Deduct score based on the number of unprotected pods
+    score -= unprotectedPodsCount
 
-	if score < 1 {
-		score = 1 // Minimum score
-	}
+    if score > 100 {
+        score = 100
+    } else if score < 1 {
+        score = 1
+    }
 
-	return score
+    return score
 }
 
 // INTERACTIVE DASHBOARD LOGIC
