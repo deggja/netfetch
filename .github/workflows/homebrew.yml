@@ -39,39 +39,33 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Print VERSION
-        run: echo "Version is $VERSION"
+      - name: Create temporary directory
+        run: mkdir temp
 
       - name: Download macOS tarball
         run: |
-          wget https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz -O netfetch_darwin_amd64.tar.gz
+          wget https://github.com/deggja/netfetch/releases/download/${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz -O temp/netfetch_darwin_amd64.tar.gz
 
       - name: Calculate macOS SHA256
-        id: macos_sha
         run: |
-          SHA=$(sha256sum netfetch_darwin_amd64.tar.gz | awk '{print $1}')
+          SHA=$(sha256sum temp/netfetch_darwin_amd64.tar.gz | awk '{print $1}')
           echo "MACOS_SHA256=$SHA" >> $GITHUB_ENV
 
       - name: Download Linux tarball
         run: |
-          wget https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz -O netfetch_linux_amd64.tar.gz
+          wget https://github.com/deggja/netfetch/releases/download/${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz -O temp/netfetch_linux_amd64.tar.gz
 
       - name: Calculate Linux SHA256
-        id: linux_sha
         run: |
-          SHA=$(sha256sum netfetch_linux_amd64.tar.gz | awk '{print $1}')
+          SHA=$(sha256sum temp/netfetch_linux_amd64.tar.gz | awk '{print $1}')
           echo "LINUX_SHA256=$SHA" >> $GITHUB_ENV
 
       - name: Update Homebrew Formula
         run: |
           FORMULA_FILE="netfetch.rb"
-          
-          # Update macOS URL and SHA256
-          sed -i "s|url \".*darwin_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz\"|" $FORMULA_FILE
+          sed -i "s|url \".*darwin_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz\"|" $FORMULA_FILE
           sed -i "s|sha256 \".*\"|sha256 \"${{ env.MACOS_SHA256 }}\"|" $FORMULA_FILE
-          
-          # Update Linux URL and SHA256
-          sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
+          sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
           sed -i "s|sha256 \".*\"|sha256 \"${{ env.LINUX_SHA256 }}\"|" $FORMULA_FILE
 
       - name: Commit and Push changes
