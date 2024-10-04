@@ -22,7 +22,25 @@ jobs:
 
       - name: Extract release version
         id: extract_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+        run: |
+            if [ "${{ github.event_name }}" == "release" ]; then
+                TAG="${{ github.event.release.tag_name }}"
+                VERSION="${TAG#v}"
+                echo "Using release tag: $TAG"
+            elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+                TAG="${{ github.event.inputs.tag }}"
+                VERSION="${TAG#v}"
+                echo "Using workflow_dispatch tag: $TAG"
+            else
+                echo "Unsupported event: $GITHUB_EVENT_NAME"
+                exit 1
+            fi
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print VERSION
+        run: echo "Version is $VERSION"
 
       - name: Download macOS tarball
         run: |
