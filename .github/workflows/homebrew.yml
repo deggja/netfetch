@@ -64,12 +64,6 @@ jobs:
           SHA=$(sha256sum temp/netfetch_linux_amd64.tar.gz | awk '{print $1}')
           echo "LINUX_SHA256=$SHA" >> $GITHUB_ENV
 
-      - name: Fetch Latest Changes from Main
-        run: |
-          git fetch origin main
-          git checkout main
-          git pull origin main
-
       - name: Update Homebrew Formula
         run: |
           FORMULA_FILE="formula/netfetch.rb"
