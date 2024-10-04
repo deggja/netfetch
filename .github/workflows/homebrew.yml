@@ -109,4 +109,3 @@ jobs:
           branch: chore/homebrew-${{ env.VERSION }}
           add-paths: |
             formula/netfetch.rb
-          delete-branch: true
