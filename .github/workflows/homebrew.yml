@@ -64,10 +64,11 @@ jobs:
           SHA=$(sha256sum temp/netfetch_linux_amd64.tar.gz | awk '{print $1}')
           echo "LINUX_SHA256=$SHA" >> $GITHUB_ENV
 
-      - name: Debug - Print SHA256 Variables
+      - name: Fetch Latest Changes from Main
         run: |
-          echo "MACOS_SHA256: $MACOS_SHA256"
-          echo "LINUX_SHA256: $LINUX_SHA256"
+          git fetch origin main
+          git checkout main
+          git pull origin main
 
       - name: Update Homebrew Formula
         run: |
@@ -79,12 +80,6 @@ jobs:
     
       - name: Remove temp directory
         run: rm -rf temp
-
-      - name: Fetch Latest Changes from Main
-        run: |
-          git fetch origin main
-          git checkout main
-          git pull origin main
 
       - name: Commit and Push changes
         uses: stefanzweifel/git-auto-commit-action@v5
