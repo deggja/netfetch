@@ -14,6 +14,9 @@ jobs:
   update-homebrew:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,7 +70,7 @@ jobs:
 
       - name: Update Homebrew Formula
         run: |
-          FORMULA_FILE="netfetch.rb"
+          FORMULA_FILE="formula/netfetch.rb"
           sed -i "s|url \".*darwin_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz\"|" $FORMULA_FILE
           sed -i "s|sha256 \".*\"|sha256 \"${{ env.MACOS_SHA256 }}\"|" $FORMULA_FILE
           sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
@@ -79,7 +82,7 @@ jobs:
           commit_message: "chore: update homebrew formula for v${{ env.VERSION }}"
           branch: chore/homebrew-${{ env.VERSION }}
           create_branch: true
-          file_pattern: netfetch.rb
+          file_pattern: "formula/netfetch.rb"
           commit_user_name: Netfetch Bot
           commit_author: Netfetch Bot <bot@netfetch.com>
           commit_user_email: "bot@netfetch.com"
