@@ -64,7 +64,7 @@ jobs:
 
       - name: Update Homebrew Formula
         run: |
-          FORMULA_FILE="Formula/netfetch.rb"
+          FORMULA_FILE="netfetch.rb"
           
           # Update macOS URL and SHA256
           sed -i "s|url \".*darwin_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz\"|" $FORMULA_FILE
