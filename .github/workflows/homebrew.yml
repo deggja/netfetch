@@ -79,6 +79,18 @@ jobs:
     
       - name: Remove temp directory
         run: rm -rf temp
+
+      - name: Fetch Latest Changes from Main
+        run: |
+          git fetch origin main
+          git checkout main
+          git pull origin main
+
+      - name: Pull Remote Branch Changes
+        run: |
+          git fetch origin chore/homebrew-${{ env.VERSION }} || echo "Branch not found. Continuing..."
+          git checkout -B chore/homebrew-${{ env.VERSION }} origin/chore/homebrew-${{ env.VERSION }} || echo "Creating new branch chore/homebrew-${{ env.VERSION }}"
+          git pull origin chore/homebrew-${{ env.VERSION }} || echo "No remote changes to pull"
     
       - name: Commit and Push changes
         uses: stefanzweifel/git-auto-commit-action@v5
