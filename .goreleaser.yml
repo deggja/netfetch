@@ -49,9 +49,6 @@ archives:
     format: tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     wrap_in_directory: true
-before:
-  hooks:
-    - cd backend && go mod tidy
 
 # Release Configuration
 release:
