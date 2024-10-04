@@ -44,7 +44,7 @@ jobs:
 
       - name: Download macOS tarball
         run: |
-          wget https://github.com/deggja/netfetch/releases/download/${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz -O temp/netfetch_darwin_amd64.tar.gz
+          wget https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz -O temp/netfetch_darwin_amd64.tar.gz
 
       - name: Calculate macOS SHA256
         run: |
@@ -53,7 +53,7 @@ jobs:
 
       - name: Download Linux tarball
         run: |
-          wget https://github.com/deggja/netfetch/releases/download/${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz -O temp/netfetch_linux_amd64.tar.gz
+          wget https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz -O temp/netfetch_linux_amd64.tar.gz
 
       - name: Calculate Linux SHA256
         run: |
@@ -63,9 +63,9 @@ jobs:
       - name: Update Homebrew Formula
         run: |
           FORMULA_FILE="netfetch.rb"
-          sed -i "s|url \".*darwin_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz\"|" $FORMULA_FILE
+          sed -i "s|url \".*darwin_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz\"|" $FORMULA_FILE
           sed -i "s|sha256 \".*\"|sha256 \"${{ env.MACOS_SHA256 }}\"|" $FORMULA_FILE
-          sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
+          sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
           sed -i "s|sha256 \".*\"|sha256 \"${{ env.LINUX_SHA256 }}\"|" $FORMULA_FILE
 
       - name: Commit and Push changes
