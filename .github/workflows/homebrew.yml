@@ -79,7 +79,11 @@ jobs:
         with:
           commit_message: "chore: update homebrew formula for v${{ env.VERSION }}"
           branch: chore/homebrew-${{ env.VERSION }}
+          create_branch: true
           file_pattern: netfetch.rb
+          commit_user_name: Netfetch Bot
+          commit_author: Netfetch Bot <bot@netfetch.com>
+          commit_user_email: "bot@netfetch.com"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
