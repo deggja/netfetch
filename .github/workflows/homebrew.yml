@@ -76,6 +76,9 @@ jobs:
           sed -i "s|sha256 \".*\"|sha256 \"${{ env.MACOS_SHA256 }}\"|" $FORMULA_FILE
           sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
           sed -i "s|sha256 \".*\"|sha256 \"${{ env.LINUX_SHA256 }}\"|" $FORMULA_FILE
+    
+      - name: Remove temp directory
+        run: rm -rf temp
 
       - name: Fetch Latest Changes from Main
         run: |
