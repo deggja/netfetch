@@ -1,0 +1,72 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to update Homebrew formula (e.g., v1.2.3)'
+        required: true
+        default: ''
+
+jobs:
+  update-homebrew:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract release version
+        id: extract_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Download macOS tarball
+        run: |
+          wget https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz -O netfetch_darwin_amd64.tar.gz
+
+      - name: Calculate macOS SHA256
+        id: macos_sha
+        run: |
+          SHA=$(sha256sum netfetch_darwin_amd64.tar.gz | awk '{print $1}')
+          echo "MACOS_SHA256=$SHA" >> $GITHUB_ENV
+
+      - name: Download Linux tarball
+        run: |
+          wget https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz -O netfetch_linux_amd64.tar.gz
+
+      - name: Calculate Linux SHA256
+        id: linux_sha
+        run: |
+          SHA=$(sha256sum netfetch_linux_amd64.tar.gz | awk '{print $1}')
+          echo "LINUX_SHA256=$SHA" >> $GITHUB_ENV
+
+      - name: Update Homebrew Formula
+        run: |
+          FORMULA_FILE="Formula/netfetch.rb"
+          
+          # Update macOS URL and SHA256
+          sed -i "s|url \".*darwin_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz\"|" $FORMULA_FILE
+          sed -i "s|sha256 \".*\"|sha256 \"${{ env.MACOS_SHA256 }}\"|" $FORMULA_FILE
+          
+          # Update Linux URL and SHA256
+          sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
+          sed -i "s|sha256 \".*\"|sha256 \"${{ env.LINUX_SHA256 }}\"|" $FORMULA_FILE
+
+      - name: Commit and Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update homebrew formula for v${{ env.VERSION }}"
+          branch: chore/homebrew-${{ env.VERSION }}
+          file_pattern: netfetch.rb
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          title: "chore: update homebrew formula for v${{ env.VERSION }}"
+          body: "Automated update of Homebrew formula to version v${{ env.VERSION }}."
+          branch: chore/homebrew-${{ env.VERSION }}
+          base: main
