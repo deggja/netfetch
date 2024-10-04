@@ -16,6 +16,7 @@ jobs:
 
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -83,14 +84,19 @@ jobs:
           branch: chore/homebrew-${{ env.VERSION }}
           create_branch: true
           file_pattern: "formula/netfetch.rb"
-          commit_user_name: Netfetch Bot
-          commit_author: Netfetch Bot <bot@netfetch.com>
+          commit_user_name: "Netfetch Bot"
+          commit_author: "Netfetch Bot <bot@netfetch.com>"
           commit_user_email: "bot@netfetch.com"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
           title: "chore: update homebrew formula for v${{ env.VERSION }}"
+          committer: "Netfetch Bot <bot@netfetch.com>"
+          author: "Netfetch Bot <bot@netfetch.com>"
+          commit-message: "chore: update homebrew formula for v${{ env.VERSION }}"
           body: "Automated update of Homebrew formula to version v${{ env.VERSION }}."
           branch: chore/homebrew-${{ env.VERSION }}
-          base: main
+          add-paths: |
+            formula/netfetch.rb
+          delete-branch: true
