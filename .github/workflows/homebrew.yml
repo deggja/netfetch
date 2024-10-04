@@ -77,6 +77,12 @@ jobs:
           sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
           sed -i "s|sha256 \".*\"|sha256 \"${{ env.LINUX_SHA256 }}\"|" $FORMULA_FILE
 
+      - name: Fetch Latest Changes from Main
+        run: |
+          git fetch origin main
+          git checkout main
+          git pull origin main
+    
       - name: Commit and Push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
