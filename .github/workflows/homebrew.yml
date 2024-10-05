@@ -87,11 +87,20 @@ jobs:
           commit_message: "chore: update homebrew formula for v${{ env.VERSION }}"
           branch: chore/homebrew-${{ env.VERSION }}
           create_branch: true
-          push_options: '--force'
           file_pattern: "formula/netfetch.rb"
           commit_user_name: "Netfetch Bot"
           commit_author: "Netfetch Bot <bot@netfetch.com>"
           commit_user_email: "bot@netfetch.com"
+
+      - name: Fetch latest state of branches
+        run: |
+          git fetch origin main:main
+          git fetch origin chore/homebrew-${{ env.VERSION }}:chore/homebrew-${{ env.VERSION }}
+
+      - name: Log differences from main
+        run: |
+          echo "Changes made to the branch relative to main:"
+          git diff --name-status origin/main...chore/homebrew-${{ env.VERSION }}
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
