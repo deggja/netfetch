@@ -92,14 +92,14 @@ jobs:
           commit_author: "Netfetch Bot <bot@netfetch.com>"
           commit_user_email: "bot@netfetch.com"
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: chore/homebrew-${{ env.VERSION }}
-          base: main
-          title: "chore: update homebrew formula for v${{ env.VERSION }}"
-          committer: "Netfetch Bot <bot@netfetch.com>"
-          author: "Netfetch Bot <bot@netfetch.com>"
-          body: "Automated update of Homebrew formula to version v${{ env.VERSION }}."
-          draft: false
+      - name: Create Pull Request Using GitHub CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --title "chore: update homebrew formula for v${{ env.VERSION }}" \
+            --body "This is an automated pull request. This pull request updates the Homebrew formula to version v${{ env.VERSION }} with the latest binary URLs and checksums." \
+            --base main \
+            --head chore/homebrew-${{ env.VERSION }} \
+            --label homebrew,automated \
+            --reviewer deggja \
