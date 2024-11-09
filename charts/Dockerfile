@@ -34,8 +34,6 @@ WORKDIR /usr/local/bin/
 # Copy the compiled Go binary
 COPY --from=gobuilder /app/backend/netfetch /usr/local/bin/
 
-# Install any runtime dependencies here (if necessary)
-
 # Expose the port the app runs on
 EXPOSE 8080
 
