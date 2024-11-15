@@ -431,7 +431,9 @@ func GetClientset(kubeconfigPath string) (*kubernetes.Clientset, error) {
 
 	if kubeconfigPath != "" {
 		// Use the provided kubeconfig
+		fmt.Println("Mode: CLI")
 		fmt.Println("Using provided kubeconfig path: ", kubeconfigPath)
+		fmt.Printf("\n")
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build config from kubeconfig path %s: %v", kubeconfigPath, err)
