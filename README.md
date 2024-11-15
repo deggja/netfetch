@@ -107,6 +107,12 @@ Run `netfetch` in dryrun against a cluster.
 netfetch scan --dryrun
 ```
 
+You can also specify the desired kubeconfig file by using the `--kubeconfig /path/to/config` flag.
+
+```sh
+netfetch scan --kubeconfig /Users/xxx/.kube/config
+```
+
 Run `netfetch` in dryrun against a namespace
 
 ```sh
@@ -188,7 +194,7 @@ The Netfetch Dashboard offers an intuitive interface for interacting with your K
 
 ### Netfetch score 🥇
 
-The `netfetch` tool provides a basic score at the end of each scan. The score ranges from 1 to 42, with 1 being the lowest and 42 being the highest possible score.
+The `netfetch` tool provides a basic score at the end of each scan. The score ranges from 1 to 100, with 1 being the lowest and 100 being the highest possible score.
 
 Your score will decrease based on the amount of workloads in your cluster that are running without being targeted by a network policy.
 

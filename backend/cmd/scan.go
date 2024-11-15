@@ -10,11 +10,12 @@ import (
 )
 
 var (
-	dryRun       bool
-	native       bool
-	cilium       bool
-	verbose      bool
-	targetPolicy string
+	dryRun         bool
+	native         bool
+	cilium         bool
+	verbose        bool
+	targetPolicy   string
+	kubeconfigPath string
 )
 
 var scanCmd = &cobra.Command{
@@ -33,12 +34,12 @@ var scanCmd = &cobra.Command{
 		}
 
 		// Initialize the Kubernetes clients
-		clientset, err := k8s.GetClientset()
+		clientset, err := k8s.GetClientset(kubeconfigPath)
 		if err != nil {
 			fmt.Println("Error creating Kubernetes client:", err)
 			return
 		}
-		dynamicClient, err := k8s.GetCiliumDynamicClient()
+		dynamicClient, err := k8s.GetCiliumDynamicClient(kubeconfigPath)
 		if err != nil {
 			fmt.Println("Error creating Kubernetes dynamic client:", err)
 			return
@@ -115,7 +116,7 @@ var scanCmd = &cobra.Command{
 		// Default to native scan if no specific type is mentioned or if --native is used
 		if !cilium || native {
 			fmt.Println("Running native network policies scan...")
-			nativeScanResult, err := k8s.ScanNetworkPolicies(namespace, dryRun, false, true, true, true)
+			nativeScanResult, err := k8s.ScanNetworkPolicies(namespace, dryRun, false, true, true, true, kubeconfigPath)
 			if err != nil {
 				fmt.Println("Error during Kubernetes native network policies scan:", err)
 			} else {
@@ -129,13 +130,13 @@ var scanCmd = &cobra.Command{
 			// Perform cluster wide Cilium scan first if no namespace is specified
 			if namespace == "" {
 				fmt.Println("Running cluster wide Cilium network policies scan...")
-				dynamicClient, err := k8s.GetCiliumDynamicClient()
+				dynamicClient, err := k8s.GetCiliumDynamicClient(kubeconfigPath)
 				if err != nil {
 					fmt.Println("Error obtaining dynamic client:", err)
 					return
 				}
 
-				clusterwideScanResult, err := k8s.ScanCiliumClusterwideNetworkPolicies(dynamicClient, false, dryRun, true)
+				clusterwideScanResult, err := k8s.ScanCiliumClusterwideNetworkPolicies(dynamicClient, false, dryRun, true, kubeconfigPath)
 				if err != nil {
 					fmt.Println("Error during cluster wide Cilium network policies scan:", err)
 				} else {
@@ -150,7 +151,7 @@ var scanCmd = &cobra.Command{
 
 			// Proceed with normal Cilium network policy scan
 			fmt.Println("Running cilium network policies scan...")
-			ciliumScanResult, err := k8s.ScanCiliumNetworkPolicies(namespace, dryRun, false, true, true, true)
+			ciliumScanResult, err := k8s.ScanCiliumNetworkPolicies(namespace, dryRun, false, true, true, true, kubeconfigPath)
 			if err != nil {
 				fmt.Println("Error during Cilium network policies scan:", err)
 			} else {
@@ -196,6 +197,7 @@ func createTargetPodsTable(pods [][]string) string {
 }
 
 func init() {
+	scanCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file (optional)")
 	scanCmd.Flags().BoolVarP(&dryRun, "dryrun", "d", false, "Perform a dry run without applying any changes")
 	scanCmd.Flags().BoolVar(&native, "native", false, "Scan only native network policies")
 	scanCmd.Flags().BoolVar(&cilium, "cilium", false, "Scan only Cilium network policies (includes cluster wide policies if no namespace is specified)")

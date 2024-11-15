@@ -2,9 +2,7 @@ package k8s
 
 import (
 	"context"
-	"encoding/json"
 	"log"
-	"net/http"
 
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,33 +67,6 @@ func gatherVisualizationData(clientset kubernetes.Interface, namespace string) (
 	return vizData, nil
 }
 
-// HandleVisualizationRequest handles the HTTP request for serving visualization data.
-func HandleVisualizationRequest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	namespace := r.URL.Query().Get("namespace")
-
-	clientset, err := GetClientset()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	vizData, err := gatherVisualizationData(clientset, namespace)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(vizData); err != nil {
-		http.Error(w, "Failed to encode visualization data", http.StatusInternalServerError)
-	}
-}
-
 // gatherNamespacesWithPolicies returns a list of all namespaces that contain network policies.
 func GatherNamespacesWithPolicies(clientset kubernetes.Interface) ([]string, error) {
 	// Retrieve all namespaces
@@ -142,38 +113,6 @@ func GatherClusterVisualizationData(clientset kubernetes.Interface) ([]Visualiza
 	}
 
 	return clusterVizData, nil
-}
-
-// HandlePolicyYAMLRequest handles the HTTP request for serving the YAML of a network policy.
-func HandlePolicyYAMLRequest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract the policy name and namespace from query parameters
-	policyName := r.URL.Query().Get("name")
-	namespace := r.URL.Query().Get("namespace")
-	if policyName == "" || namespace == "" {
-		http.Error(w, "Policy name or namespace not provided", http.StatusBadRequest)
-		return
-	}
-
-	// Retrieve the network policy YAML
-	clientset, err := GetClientset()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	yaml, err := getNetworkPolicyYAML(clientset, namespace, policyName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/x-yaml")
-	w.Write([]byte(yaml))
 }
 
 // getNetworkPolicyYAML retrieves the YAML representation of a network policy, excluding annotations.
