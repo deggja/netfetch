@@ -4,11 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -76,8 +74,8 @@ func isNetworkError(err error) bool {
 }
 
 // Initialize client
-func InitializeClient() (*kubernetes.Clientset, error) {
-	clientset, err := GetClientset()
+func InitializeClient(kubeconfigPath string) (*kubernetes.Clientset, error) {
+	clientset, err := GetClientset(kubeconfigPath)
 	if err != nil {
 		fmt.Printf("Error creating Kubernetes client: %s\n", err)
 		return nil, err
@@ -196,7 +194,7 @@ func displayUnprotectedPods(nsName string, unprotectedPods []string, writer *buf
 	}
 }
 
-func handleCLIInteractions(nsName string, unprotectedPods []string, writer *bufio.Writer, scanResult *ScanResult) {
+func handleCLIInteractions(nsName string, unprotectedPods []string, writer *bufio.Writer, scanResult *ScanResult, kubeconfigPath string) {
 	if len(unprotectedPods) > 0 {
 		// Header
 		headerText := fmt.Sprintf("Unprotected pods found in namespace %s:", nsName)
@@ -215,7 +213,7 @@ func handleCLIInteractions(nsName string, unprotectedPods []string, writer *bufi
 
 		// Prompt for applying policies
 		if promptForPolicyApplication(nsName, writer) {
-			err := createAndApplyDefaultDenyPolicy(nsName)
+			err := createAndApplyDefaultDenyPolicy(nsName, kubeconfigPath)
 			if err != nil {
 				fmt.Fprintf(writer, "Failed to apply default deny policy in namespace %s: %s\n", nsName, err)
 			} else {
@@ -226,7 +224,7 @@ func handleCLIInteractions(nsName string, unprotectedPods []string, writer *bufi
 	}
 }
 
-func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, writer *bufio.Writer, isCLI bool, dryRun bool, scanResult *ScanResult) error {
+func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, writer *bufio.Writer, isCLI bool, dryRun bool, scanResult *ScanResult, kubeconfigPath string) error {
 	// Fetch covered pods
 	coveredPods, err := fetchCoveredPods(clientset, nsName, writer)
 	if err != nil {
@@ -245,7 +243,7 @@ func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, wr
 
 	// Only handle CLI interactions if it's CLI mode and not a dry run
 	if isCLI && !dryRun {
-		handleCLIInteractions(nsName, unprotectedPods, writer, scanResult)
+		handleCLIInteractions(nsName, unprotectedPods, writer, scanResult, kubeconfigPath)
 	} else if dryRun {
 		// If it's a dry run, we just display the data without prompting for any actions
 		displayUnprotectedPods(nsName, unprotectedPods, writer)
@@ -257,7 +255,7 @@ func processNamespacePolicies(clientset *kubernetes.Clientset, nsName string, wr
 var hasStartedNativeScan bool = false
 
 // ScanNetworkPolicies scans namespaces for network policies
-func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult bool, isCLI bool, printScore bool, printMessages bool) (*ScanResult, error) {
+func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult bool, isCLI bool, printScore bool, printMessages bool, kubeconfigPath string) (*ScanResult, error) {
 	var output bytes.Buffer
 	var namespacesToScan []string
 
@@ -266,7 +264,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 
 	writer := bufio.NewWriter(&output)
 
-	clientset, err := InitializeClient()
+	clientset, err := InitializeClient(kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +284,7 @@ func ScanNetworkPolicies(specificNamespace string, dryRun bool, returnResult boo
 	}
 
 	for _, nsName := range namespacesToScan {
-		err := processNamespacePolicies(clientset, nsName, writer, isCLI, dryRun, scanResult)
+		err := processNamespacePolicies(clientset, nsName, writer, isCLI, dryRun, scanResult, kubeconfigPath)
 		if err != nil {
 			fmt.Printf("Error processing namespace %s: %v\n", nsName, err)
 			continue
@@ -342,9 +340,9 @@ func handleOutputAndPrompts(writer *bufio.Writer, output *bytes.Buffer) {
 }
 
 // Function to create the implicit default deny if missing
-func createAndApplyDefaultDenyPolicy(namespace string) error {
+func createAndApplyDefaultDenyPolicy(namespace string, kubeconfigPath string) error {
 	// Initialize Kubernetes client
-	clientset, err := GetClientset()
+	clientset, err := GetClientset(kubeconfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes client: %v", err)
 	}
@@ -417,64 +415,13 @@ func CalculateScore(hasPolicies bool, hasDenyAll bool, unprotectedPodsCount int)
     return score
 }
 
-// INTERACTIVE DASHBOARD LOGIC
-
-// handleScanRequest handles the HTTP request for scanning network policies
-func HandleScanRequest(w http.ResponseWriter, r *http.Request) {
-	// Extract parameters from request, e.g., namespace
-	namespace := r.URL.Query().Get("namespace")
-
-	// Perform the scan
-	result, err := ScanNetworkPolicies(namespace, false, true, false, false, false)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Respond with JSON
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
-}
-
-// HandleNamespaceListRequest lists all non-system Kubernetes namespaces
-func HandleNamespaceListRequest(w http.ResponseWriter, r *http.Request) {
-	clientset, err := GetClientset()
-	if err != nil {
-		http.Error(w, "Failed to create Kubernetes client: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	namespaces, err := clientset.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		// Handle forbidden access error specifically
-		if statusErr, isStatus := err.(*k8serrors.StatusError); isStatus {
-			if statusErr.Status().Code == http.StatusForbidden {
-				http.Error(w, "Access forbidden: "+err.Error(), http.StatusForbidden)
-				return
-			}
-		}
-		http.Error(w, "Failed to list namespaces: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var namespaceList []string
-	for _, ns := range namespaces.Items {
-		if !IsSystemNamespace(ns.Name) {
-			namespaceList = append(namespaceList, ns.Name)
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string][]string{"namespaces": namespaceList})
-}
-
 var (
 	isClientInitialized = false
 	clientset           *kubernetes.Clientset
 )
 
 // GetClientset creates a new Kubernetes clientset
-func GetClientset() (*kubernetes.Clientset, error) {
+func GetClientset(kubeconfigPath string) (*kubernetes.Clientset, error) {
 	if isClientInitialized {
 		return clientset, nil
 	}
@@ -482,9 +429,19 @@ func GetClientset() (*kubernetes.Clientset, error) {
 	var config *rest.Config
 	var err error
 
+	if kubeconfigPath != "" {
+		// Use the provided kubeconfig
+		fmt.Println("Using provided kubeconfig path: ", kubeconfigPath)
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build config from kubeconfig path %s: %v", kubeconfigPath, err)
+		}
+	} else {
 	// First try to use the in-cluster configuration
 	config, err = rest.InClusterConfig()
-	if err != nil {
+	if err == nil {
+		fmt.Println("Using in-cluster Kubernetes configuration")
+	} else {
 		fmt.Println("Mode: CLI")
 
 		// Fallback to kubeconfig
@@ -501,9 +458,8 @@ func GetClientset() (*kubernetes.Clientset, error) {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build config from kubeconfig path %s: %v", kubeconfig, err)
-		}
-	} else {
-		fmt.Println("Using in-cluster Kubernetes configuration")
+			}
+		} 
 	}
 
 	// Create and store the clientset
@@ -514,41 +470,6 @@ func GetClientset() (*kubernetes.Clientset, error) {
 
 	isClientInitialized = true
 	return clientset, nil
-}
-
-func HandleAddPolicyRequest(w http.ResponseWriter, r *http.Request) {
-	// Define a struct to parse the incoming request
-	type request struct {
-		Namespace string `json:"namespace"`
-	}
-
-	// Parse the incoming JSON request
-	var req request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Apply the default deny policy
-	err := createAndApplyDefaultDenyPolicy(req.Namespace)
-	if err != nil {
-		http.Error(w, "Failed to apply default deny policy: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Respond with success message
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "Implicit default deny all network policy successfully added to namespace " + req.Namespace})
-
-	scanResult, err := ScanNetworkPolicies(req.Namespace, false, true, false, false, false)
-	if err != nil {
-		http.Error(w, "Error re-scanning after applying policy: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Respond with updated scan results
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(scanResult)
 }
 
 // contains checks if a string is present in a slice

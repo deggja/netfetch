@@ -111,7 +111,7 @@ func createPoliciesTable(policiesInfo [][]string) string {
 }
 
 // GetCiliumDynamicClient returns a dynamic interface to query for Cilium policies
-func GetCiliumDynamicClient() (dynamic.Interface, error) {
+func GetCiliumDynamicClient(kubeconfigPath string) (dynamic.Interface, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		kubeconfigPath := os.Getenv("KUBECONFIG")
@@ -132,8 +132,8 @@ func GetCiliumDynamicClient() (dynamic.Interface, error) {
 }
 
 // initializeCiliumClients creates and returns initialized dynamic and Kubernetes clientsets.
-func initializeCiliumClients() (dynamic.Interface, *kubernetes.Clientset, error) {
-	dynamicClient, err := GetCiliumDynamicClient()
+func initializeCiliumClients(kubeconfigPath string) (dynamic.Interface, *kubernetes.Clientset, error) {
+	dynamicClient, err := GetCiliumDynamicClient(kubeconfigPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating dynamic Kubernetes client: %s", err)
 	}
@@ -141,7 +141,7 @@ func initializeCiliumClients() (dynamic.Interface, *kubernetes.Clientset, error)
 		return nil, nil, fmt.Errorf("failed to create dynamic client: client is nil")
 	}
 
-	clientset, err := GetClientset()
+	clientset, err := GetClientset(kubeconfigPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating Kubernetes clientset: %s", err)
 	}
@@ -309,7 +309,7 @@ var hasStartedCiliumScan bool = false
 var globallyProtectedPods = make(map[string]struct{})
 
 // ScanCiliumNetworkPolicies scans namespaces for Cilium network policies
-func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResult bool, isCLI bool, printScore bool, printMessages bool) (*ScanResult, error) {
+func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResult bool, isCLI bool, printScore bool, printMessages bool, kubeconfigPath string) (*ScanResult, error) {
 	var output bytes.Buffer
 
 	unprotectedPodsCount := 0
@@ -317,7 +317,7 @@ func ScanCiliumNetworkPolicies(specificNamespace string, dryRun bool, returnResu
 
 	writer := bufio.NewWriter(&output)
 
-	dynamicClient, clientset, err := initializeCiliumClients()
+	dynamicClient, clientset, err := initializeCiliumClients(kubeconfigPath)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -532,7 +532,7 @@ func reportPodProtectionStatus(writer *bufio.Writer, unprotectedPods []string) {
 }
 
 // ScanCiliumClusterwideNetworkPolicies scans the cluster for Cilium Clusterwide Network Policies
-func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, printMessages bool, dryRun bool, isCLI bool) (*ScanResult, error) {
+func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, printMessages bool, dryRun bool, isCLI bool, kubeconfigPath string) (*ScanResult, error) {
 	// Buffer and writer setup to capture output for both console and file.
 	var output bytes.Buffer
 	writer := bufio.NewWriter(&output)
@@ -543,7 +543,7 @@ func ScanCiliumClusterwideNetworkPolicies(dynamicClient dynamic.Interface, print
 		return nil, fmt.Errorf("failed to create dynamic client: client is nil")
 	}
 
-	dynamicClient, clientset, err := initializeCiliumClients()
+	dynamicClient, clientset, err := initializeCiliumClients(kubeconfigPath)
 	if err != nil {
 		fmt.Println("Error initializing clients:", err)
 		return nil, err
