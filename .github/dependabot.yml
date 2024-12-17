@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    rebase-strategy: disabled
+    directory: "/"
+    schedule:
+      interval: "daily"
+    groups:
+      actions:
+        patterns: 
+          - '*'
+  - package-ecosystem: "gomod"
+    rebase-strategy: "disabled"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    groups:
+      go:
+        patterns: 
+          - '*'
