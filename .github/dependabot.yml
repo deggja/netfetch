@@ -11,7 +11,7 @@ updates:
           - '*'
   - package-ecosystem: "gomod"
     rebase-strategy: "disabled"
-    directory: "/"
+    directory: "/backend"
     schedule:
       interval: "daily"
     groups:
