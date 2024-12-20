@@ -14,7 +14,7 @@ require (
 require (
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/rakyll/statik v0.1.7
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
