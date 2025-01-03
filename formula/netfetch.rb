@@ -4,7 +4,7 @@ class Netfetch < Formula
 
   if OS.mac?
     url "https://github.com/deggja/netfetch/releases/download/v0.5.4/netfetch_0.5.4_darwin_amd64.tar.gz"
-    sha256 "8757efca2f1196777acc45299773da105d8ce40a260e5de8d9f72d942f6f896b"
+    sha256 "ada24b740c746bdf14e67c2153dbc02440462aa765e7ac31b87439aff845d48c"
   elsif OS.linux?
     url "https://github.com/deggja/netfetch/releases/download/v0.5.4/netfetch_0.5.4_linux_amd64.tar.gz"
     sha256 "8757efca2f1196777acc45299773da105d8ce40a260e5de8d9f72d942f6f896b"
