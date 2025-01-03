@@ -68,9 +68,9 @@ jobs:
         run: |
           FORMULA_FILE="formula/netfetch.rb"
           sed -i "s|url \".*darwin_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_darwin_amd64.tar.gz\"|" $FORMULA_FILE
-          sed -i "s|sha256 \".*\"|sha256 \"${{ env.MACOS_SHA256 }}\"|" $FORMULA_FILE
+          sed -i -E "/if OS\.mac\?/,/elsif OS\.linux\?/ s|sha256 \".*\"|sha256 \"${{ env.MACOS_SHA256 }}\"|" "$FORMULA_FILE"
           sed -i "s|url \".*linux_amd64\.tar\.gz\"|url \"https://github.com/deggja/netfetch/releases/download/v${{ env.VERSION }}/netfetch_${{ env.VERSION }}_linux_amd64.tar.gz\"|" $FORMULA_FILE
-          sed -i "s|sha256 \".*\"|sha256 \"${{ env.LINUX_SHA256 }}\"|" $FORMULA_FILE
+          sed -i -E "/elsif OS\.linux\?/,/end/ s|sha256 \".*\"|sha256 \"${{ env.LINUX_SHA256 }}\"|" "$FORMULA_FILE"
 
       - name: Fetch Latest Changes from Main
         run: |
