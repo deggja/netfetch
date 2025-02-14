@@ -1,14 +1,14 @@
 module github.com/deggja/netfetch/backend
 
 go 1.21
-toolchain go1.23.5
+toolchain go1.23.6
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/spf13/cobra v1.8.1
-	k8s.io/api v0.32.1
-	k8s.io/apimachinery v0.32.1
-	k8s.io/client-go v0.32.1
+	k8s.io/api v0.32.2
+	k8s.io/apimachinery v0.32.2
+	k8s.io/client-go v0.32.2
 )
 
 require (
