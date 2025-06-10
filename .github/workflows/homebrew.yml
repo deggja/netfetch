@@ -82,7 +82,7 @@ jobs:
         run: rm -rf temp
 
       - name: Commit and Push changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v6
         with:
           commit_message: "chore: update homebrew formula for v${{ env.VERSION }}"
           branch: chore/homebrew-${{ env.VERSION }}
