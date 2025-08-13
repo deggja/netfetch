@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: lint_pr_title
         id: lint_pr_title
-        uses: amannn/action-semantic-pull-request@v5.5.3
+        uses: amannn/action-semantic-pull-request@v6.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: marocchino/sticky-pull-request-comment@v2
