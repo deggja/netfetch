@@ -180,12 +180,12 @@ func fetchCiliumPolicies(dynamicClient dynamic.Interface, nsName string, writer 
 
 // helper function to ensure pods are not added to list multiple times
 func addUniquePodDetail(podDetails []string, detail string) []string {
-    for _, d := range podDetails {
-        if d == detail {
-            return podDetails // pod already in the list.
-        }
-    }
-    return append(podDetails, detail) // add pod if its not in list
+	for _, d := range podDetails {
+		if d == detail {
+			return podDetails // pod already in the list.
+		}
+	}
+	return append(podDetails, detail) // add pod if its not in list
 }
 
 // determinePodCoverage identifies unprotected pods in a namespace based on the fetched Cilium policies.
@@ -204,15 +204,15 @@ func determinePodCoverage(clientset *kubernetes.Clientset, nsName string, polici
 			continue
 		}
 		podIdentifier := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
-        if _, exists := globallyProtectedPods[podIdentifier]; !exists {
-            if !IsPodProtected(writer, clientset, pod, policies, hasDenyAll, globallyProtectedPods) {
-                unprotectedPodDetails := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
-                unprotectedPods = addUniquePodDetail(unprotectedPods, unprotectedPodDetails)
-            } else {
-                globallyProtectedPods[podIdentifier] = struct{}{} // Mark the pod as protected globally
-            }
-        }
-    }
+		if _, exists := globallyProtectedPods[podIdentifier]; !exists {
+			if !IsPodProtected(writer, clientset, pod, policies, hasDenyAll, globallyProtectedPods) {
+				unprotectedPodDetails := fmt.Sprintf("%s %s %s", pod.Namespace, pod.Name, pod.Status.PodIP)
+				unprotectedPods = addUniquePodDetail(unprotectedPods, unprotectedPodDetails)
+			} else {
+				globallyProtectedPods[podIdentifier] = struct{}{} // Mark the pod as protected globally
+			}
+		}
+	}
 
 	return unprotectedPods, nil
 }
@@ -635,10 +635,10 @@ func isProtectedByDefaultDeny(policy *unstructured.Unstructured, globallyProtect
 
 func isProtectedByLabelMatch(policies []*unstructured.Unstructured, pod corev1.Pod, globallyProtectedPods map[string]struct{}, podIdentifier string) bool {
 	for _, policy := range policies {
-		endpointSelector, _, _ := unstructured.NestedMap(policy.UnstructuredContent(), "endpointSelector", "matchLabels")
+		endpointSelector, _, _ := unstructured.NestedMap(policy.UnstructuredContent(), "spec", "endpointSelector", "matchLabels")
 		if MatchesLabels(pod.Labels, endpointSelector) {
-			ingress, foundIngress, _ := unstructured.NestedSlice(policy.UnstructuredContent(), "ingress")
-			egress, foundEgress, _ := unstructured.NestedSlice(policy.UnstructuredContent(), "egress")
+			ingress, foundIngress, _ := unstructured.NestedSlice(policy.UnstructuredContent(), "spec", "ingress")
+			egress, foundEgress, _ := unstructured.NestedSlice(policy.UnstructuredContent(), "spec", "egress")
 
 			// Check for deny-all conditions based on empty ingress/egress
 			if (foundIngress && (IsEmptyOrOnlyContainsEmptyObjects(ingress) || IsSpecificallyEmpty(ingress))) ||
