@@ -722,6 +722,8 @@ func IsSpecificallyEmpty(slice []interface{}) bool {
 func MatchesLabels(podLabels map[string]string, policySelector map[string]interface{}) bool {
 	for key, value := range policySelector {
 		if val, ok := value.(string); ok {
+			// cillium recommends prefixing kubernetes keys in labelselectors with 'k8s:', optionally
+			key := strings.TrimPrefix(key, "k8s:")
 			if podVal, podOk := podLabels[key]; !podOk || podVal != val {
 				return false
 			}
